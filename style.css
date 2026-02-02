@@ -1,0 +1,83 @@
+:root {
+    --bg-color: #F7F1E1; --sidebar-bg: #F1EADA; --glass: rgba(255, 255, 255, 0.6);
+    --text: #3F3F2C; --text-muted: #66371B; --primary: #81754B; --accent: #B4833D;
+    --shadow: 0 10px 30px rgba(63, 63, 44, 0.08);
+}
+[data-theme="dark"] {
+    --bg-color: #2b2b1e; --sidebar-bg: #1f1f16; --glass: rgba(43, 43, 30, 0.8);
+    --text: #F7F1E1; --text-muted: #CEC1A8; --primary: #B4833D;
+}
+body { margin: 0; font-family: 'Nunito', sans-serif; background-color: var(--bg-color); color: var(--text); height: 100vh; overflow: hidden; }
+
+/* SOLID BG TO FIX GHOST */
+#app-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; z-index: 100; background-color: var(--bg-color); }
+
+/* SIDEBAR & MOBILE */
+.sidebar { 
+    width: 260px; background: var(--sidebar-bg); 
+    display: flex; flex-direction: column; padding: 1.5rem; 
+    border-right: 1px solid rgba(0,0,0,0.05); z-index: 200;
+    transition: transform 0.3s ease;
+}
+
+#mobile-menu-btn { display: none; } /* Hidden on PC */
+
+/* MOBILE VIEW (iPhone) */
+@media (max-width: 768px) {
+    .sidebar {
+        position: absolute; height: 100%; 
+        transform: translateX(-100%); /* Hides sidebar to the left */
+        box-shadow: 5px 0 15px rgba(0,0,0,0.1);
+    }
+    .sidebar.open { transform: translateX(0); } /* Shows sidebar when open */
+    
+    #mobile-menu-btn {
+        display: block; position: absolute; top: 15px; left: 15px; z-index: 150;
+        background: var(--primary); color: white; border: none; padding: 10px 15px;
+        border-radius: 10px; cursor: pointer; font-size: 1.2rem;
+    }
+    #close-sidebar-btn { display: block !important; } /* Show X button inside menu */
+    
+    .content { padding-top: 60px; } /* Push content down for button space */
+    .tab-content { padding: 1.5rem; } /* Less padding on phone */
+    
+    .timetable-grid { min-width: 100%; overflow-x: auto; display: block; } /* Allow scrolling */
+    .notepad-layout { grid-template-columns: 1fr; } /* Stack notes */
+    .note-sidebar { height: 200px; margin-bottom: 20px; }
+}
+
+.content { flex: 1; position: relative; overflow: hidden; padding: 0; }
+.tab-content { display: none !important; width: 100%; height: 100%; overflow-y: auto; padding: 3rem; box-sizing: border-box; }
+.tab-content.active { display: block !important; }
+
+/* COMPONENTS */
+.bubble { border-radius: 25px; }
+.bubble-right { border-top-right-radius: 30px; border-bottom-right-radius: 30px; }
+.glass-panel { background: var(--glass); border: 1px solid rgba(255,255,255,0.5); box-shadow: var(--shadow); padding: 2rem; margin-bottom: 20px; }
+.btn-primary { background: var(--primary); color: #F7F1E1; border: none; padding: 12px 25px; border-radius: 50px; cursor: pointer; font-weight: 700; transition: 0.2s; }
+.nav-btn { background: transparent; border: none; padding: 15px 20px; width: 100%; text-align: left; color: var(--text-muted); cursor: pointer; font-weight: 700; display: flex; align-items: center; gap: 12px; border-radius: 20px; margin-bottom: 5px; }
+.nav-btn.active { background: var(--primary); color: #F7F1E1; }
+.bubble-input { width: 100%; padding: 15px; border: none; border-radius: 15px; background: rgba(255,255,255,0.5); font-size: 1rem; outline: none; margin-bottom: 10px; color: var(--text); }
+
+/* PROFILE DRAG DROP */
+.profile-drop-zone { width: 140px; height: 140px; border-radius: 50%; border: 4px dashed var(--primary); position: relative; overflow: hidden; margin: 0 auto 20px auto; cursor: pointer; transition: 0.3s; }
+.profile-drop-zone:hover { border-color: var(--accent); transform: scale(1.05); }
+.profile-drop-zone img { width: 100%; height: 100%; object-fit: cover; }
+.drop-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); color: white; display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.2s; font-weight: bold; }
+.profile-drop-zone:hover .drop-overlay { opacity: 1; }
+
+/* TIMETABLE & NOTES */
+.timetable-grid { display: grid; grid-template-columns: 70px repeat(5, 1fr); gap: 6px; min-width: 800px; padding-bottom: 50px; }
+.grid-header { text-align: center; font-weight: 800; color: var(--primary); }
+.time-slot { text-align: center; font-size: 0.8rem; color: var(--text-muted); align-self: center; }
+.class-slot { background: rgba(255,255,255,0.4); border-radius: 12px; min-height: 50px; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
+.class-slot input { position: relative; z-index: 10; width: 100%; height: 100%; border: none; background: transparent; text-align: center; font-weight: 600; color: var(--text); outline: none; }
+.color-dot { width: 25px; height: 25px; border-radius: 50%; cursor: pointer; border: 2px solid rgba(0,0,0,0.1); }
+.notepad-layout { display: grid; grid-template-columns: 260px 1fr; gap: 20px; height: 80vh; }
+.rich-editor { flex: 1; outline: none; padding: 20px; font-size: 1.1rem; line-height: 1.6; overflow-y: auto; background: rgba(255,255,255,0.3); border-radius: 15px; }
+.hl-btn { width: 25px; height: 25px; border-radius: 5px; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); }
+.ios-picker-container { display: flex; justify-content: center; height: 180px; position: relative; overflow: hidden; background: rgba(255,255,255,0.3); border-radius: 20px; margin-top: 15px; }
+.picker-column { height: 100%; width: 60px; overflow-y: scroll; scroll-snap-type: y mandatory; text-align: center; scrollbar-width: none; z-index: 2; padding: 0; }
+.picker-column::-webkit-scrollbar { display: none; }
+.picker-item { height: 40px; line-height: 40px; scroll-snap-align: center; opacity: 0.4; font-weight: 700; transition: 0.2s; }
+.picker-highlight { position: absolute; top: 70px; left: 10px; right: 10px; height: 40px; background: rgba(129, 117, 75, 0.2); border-radius: 10px; pointer-events: none; z-index: 1; border: 1px solid var(--primary); }
