@@ -1,9 +1,8 @@
-/* VibeTable Logic - Mobile & Dynamic */
+/* VibeTable Logic */
 
 const CLIENT_ID = '951024875343-365jk5cjfkjbg8co3elc75jn41pe0ama.apps.googleusercontent.com'; 
 const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile';
 
-// Default config
 let appData = { 
     userName: "Student", userPic: null, theme: 'light',
     events: [], 
@@ -30,7 +29,7 @@ window.onload = function() {
     setupDragDrop();
 };
 
-/* --- 1. CORE & MOBILE UI --- */
+/* --- UI LOGIC --- */
 function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('open');
     document.getElementById('mobile-overlay').classList.toggle('open');
@@ -63,7 +62,7 @@ function switchTab(tabId) {
     }
 }
 
-/* --- 2. DYNAMIC TIMETABLE --- */
+/* --- DYNAMIC TIMETABLE --- */
 function extendTimetable(direction) {
     if(direction === 'start') {
         if(appData.startHour > 0) appData.startHour--;
@@ -78,28 +77,22 @@ function renderTimetable() {
     const grid = document.getElementById('timetable-grid');
     if(!grid) return; grid.innerHTML = ''; 
     const days = ['Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-    
-    // Header
     days.forEach(d => { 
         let div = document.createElement('div'); 
         div.className = 'grid-header'; 
         div.innerText = d; 
         grid.appendChild(div); 
     });
-    
-    // Dynamic Loop
     for (let i = appData.startHour; i <= appData.endHour; i++) {
         let time = document.createElement('div'); 
         time.className = 'time-slot'; 
         time.innerText = `${i}:00`; 
         grid.appendChild(time);
-        
         for (let j = 0; j < 5; j++) {
             let key = `${days[j+1]}-${i}`;
             let slot = document.createElement('div'); 
             slot.className = 'class-slot bubble';
             if(appData.timetableColors && appData.timetableColors[key]) slot.style.background = appData.timetableColors[key];
-            
             let input = document.createElement('input');
             input.value = appData.timetable[key] || ''; 
             input.placeholder = '+';
@@ -118,10 +111,9 @@ function renderTimetable() {
     }
 }
 
-/* --- 3. ALARM SYSTEM --- */
+/* --- ALARM --- */
 let timerInterval;
 let timerSeconds = 1500; 
-
 function updateTimerDisplay() {
     let m = Math.floor(timerSeconds / 60);
     let s = timerSeconds % 60;
@@ -139,99 +131,58 @@ function startTimer() {
         }
     }, 1000);
 }
-function pauseTimer() { 
-    clearInterval(timerInterval); 
-    timerInterval = null; 
-    document.getElementById('btn-start').classList.remove('alarm-active');
-}
-function resetTimer() { 
-    pauseTimer(); 
-    timerSeconds = 1500; 
-    updateTimerDisplay(); 
-}
-function requestNotification() {
-    if (Notification.permission !== "granted") Notification.requestPermission();
-    audio.play().then(() => audio.pause()); 
-}
+function pauseTimer() { clearInterval(timerInterval); timerInterval = null; document.getElementById('btn-start').classList.remove('alarm-active'); }
+function resetTimer() { pauseTimer(); timerSeconds = 1500; updateTimerDisplay(); }
+function requestNotification() { if (Notification.permission !== "granted") Notification.requestPermission(); audio.play().then(() => audio.pause()); }
 function triggerAlarm() {
     clearInterval(timerInterval);
     document.getElementById('btn-start').classList.remove('alarm-active');
-    
-    // Play Sound Loop
-    audio.currentTime = 0;
-    audio.play();
-    setTimeout(() => audio.play(), 1000); 
-    setTimeout(() => audio.play(), 2000);
-
-    // Browser Notification
-    if (Notification.permission === "granted") {
-        new Notification("VibeTable: Time is up!");
-    } else {
-        alert("TIME IS UP!");
-    }
+    audio.currentTime = 0; audio.play();
+    setTimeout(() => audio.play(), 1000); setTimeout(() => audio.play(), 2000);
+    if (Notification.permission === "granted") new Notification("VibeTable: Time is up!"); else alert("TIME IS UP!");
 }
 
-/* --- 4. AUTH & PERSISTENT DATA --- */
-function initGoogleAuth() {
-    try {
-        tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID, scope: SCOPES,
-            callback: async (r) => { if(r.access_token) { accessToken = r.access_token; await handleLogin(); } }
-        });
-    } catch(e) {}
-}
+/* --- AUTH & DATA --- */
+function initGoogleAuth() { try { tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: async (r) => { if(r.access_token) { accessToken = r.access_token; await handleLogin(); } } }); } catch(e) {} }
 function handleAuthClick() { tokenClient.requestAccessToken(); }
-
 async function handleLogin() {
     const login = document.getElementById('login-screen');
     if(login) login.remove(); 
     document.getElementById('app-screen').classList.remove('hidden');
     document.getElementById('app-screen').classList.add('active');
-    
     let res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {headers:{'Authorization':'Bearer '+accessToken}});
     let user = await res.json();
-    
     const sidebarPic = document.getElementById('sidebar-pic');
     const profilePic = document.getElementById('profile-pic-large');
     if(sidebarPic) sidebarPic.src = user.picture;
     if(profilePic) profilePic.src = user.picture;
-    
     await loadData();
     if(appData.userName) document.getElementById('dash-name').innerText = appData.userName;
     else document.getElementById('dash-name').innerText = user.given_name;
-    
     renderGroups(); renderTimetable(); renderEvents(); renderNotes(); updateProfileUI();
 }
-
-// PERSISTENCE LOGIC
 const CURRENT_FILE = 'vibetable_v9.json'; 
 async function loadData() {
     try {
         let q = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='" + CURRENT_FILE + "'";
         let r = await fetch(q, {headers:{'Authorization':'Bearer '+accessToken}});
         let d = await r.json();
-        
         if(d.files && d.files.length > 0) {
             let f = await fetch(`https://www.googleapis.com/drive/v3/files/${d.files[0].id}?alt=media`, {headers:{'Authorization':'Bearer '+accessToken}});
             appData = await f.json();
         } else {
-            console.log("New version not found, checking for old data...");
             let qOld = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='vibetable_v7.json'";
             let rOld = await fetch(qOld, {headers:{'Authorization':'Bearer '+accessToken}});
             let dOld = await rOld.json();
             if(dOld.files && dOld.files.length > 0) {
                 let fOld = await fetch(`https://www.googleapis.com/drive/v3/files/${dOld.files[0].id}?alt=media`, {headers:{'Authorization':'Bearer '+accessToken}});
                 appData = await fOld.json();
-                console.log("Migrated data from v7");
             }
         }
-        
         if(!appData.startHour) appData.startHour = 7;
         if(!appData.endHour) appData.endHour = 23;
-        
     } catch(e) { console.error(e); }
 }
-
 async function saveDataToDrive() {
     let blob = new Blob([JSON.stringify(appData)], {type:'application/json'});
     let form = new FormData();
@@ -239,8 +190,6 @@ async function saveDataToDrive() {
     form.append('file', blob);
     await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {method:'POST', headers:{'Authorization':'Bearer '+accessToken}, body:form});
 }
-
-/* --- OTHER UTILS --- */
 function setupDragDrop() {
     const zone = document.getElementById('drop-zone');
     if(!zone) return;
@@ -262,7 +211,6 @@ function setupDragDrop() {
         }
     };
 }
-const palette = ['#E3D8C1', '#CEC1A8', '#B59E7D', '#AAA396', '#E6CBB8', '#B4833D', '#81754B', '#584738', '#B8E6C1'];
 function renderColorPickers() {
     const c = document.getElementById('timetable-colors');
     const h = document.getElementById('highlighter-toolbar');
@@ -294,3 +242,4 @@ function updateNoteGroup() { /* Handled inline */ }
 function saveProfile() { appData.userName = document.getElementById('edit-name').value; appData.userPic = document.getElementById('edit-pic').value || appData.userPic; saveDataToDrive(); updateProfileUI(); alert("Profile Saved"); }
 function updateProfileUI() { if(appData.userName) { document.getElementById('dash-name').innerText = appData.userName; document.getElementById('edit-name').value = appData.userName; } if(appData.userPic) { document.getElementById('sidebar-pic').src = appData.userPic; document.getElementById('profile-pic-large').src = appData.userPic; } if(appData.theme === 'dark') document.body.setAttribute('data-theme', 'dark'); }
 function toggleTheme() { if(document.body.hasAttribute('data-theme')) { document.body.removeAttribute('data-theme'); appData.theme = 'light'; } else { document.body.setAttribute('data-theme', 'dark'); appData.theme = 'dark'; } saveDataToDrive(); }
+const palette = ['#E3D8C1', '#CEC1A8', '#B59E7D', '#AAA396', '#E6CBB8', '#B4833D', '#81754B', '#584738', '#B8E6C1'];
