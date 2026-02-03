@@ -1,4 +1,4 @@
-/* VibeTable Logic - Persistent & Dynamic */
+/* VibeTable Logic - Mobile & Dynamic */
 
 const CLIENT_ID = '951024875343-365jk5cjfkjbg8co3elc75jn41pe0ama.apps.googleusercontent.com'; 
 const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile';
@@ -8,12 +8,12 @@ let appData = {
     userName: "Student", userPic: null, theme: 'light',
     events: [], 
     timetable: {}, timetableColors: {}, 
-    startHour: 7, endHour: 23, // DYNAMIC HOURS
+    startHour: 7, endHour: 23, 
     notes: [], noteGroups: ['General', 'Law', 'Business']
 };
 let accessToken = null;
 let selectedColor = null;
-let audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg'); // Simple beep
+let audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg'); 
 
 const bibleVerses = [
     "I can do all things through Christ who strengthens me. - Phil 4:13",
@@ -30,7 +30,12 @@ window.onload = function() {
     setupDragDrop();
 };
 
-/* --- 1. CORE --- */
+/* --- 1. CORE & MOBILE UI --- */
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('mobile-overlay').classList.toggle('open');
+}
+
 function loadBibleQuote() {
     const index = Math.floor(Math.random() * bibleVerses.length);
     document.getElementById('daily-quote').innerText = bibleVerses[index];
@@ -50,6 +55,12 @@ function switchTab(tabId) {
     if(tabId === 'notes') renderNotes();
     if(tabId === 'countdowns') renderEvents();
     if(tabId === 'profile') updateProfileUI();
+
+    // AUTO CLOSE SIDEBAR ON MOBILE
+    if (window.innerWidth <= 768) {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('mobile-overlay').classList.remove('open');
+    }
 }
 
 /* --- 2. DYNAMIC TIMETABLE --- */
@@ -140,7 +151,7 @@ function resetTimer() {
 }
 function requestNotification() {
     if (Notification.permission !== "granted") Notification.requestPermission();
-    audio.play().then(() => audio.pause()); // Unlock audio on iOS
+    audio.play().then(() => audio.pause()); 
 }
 function triggerAlarm() {
     clearInterval(timerInterval);
@@ -193,10 +204,9 @@ async function handleLogin() {
 }
 
 // PERSISTENCE LOGIC
-const CURRENT_FILE = 'vibetable_v9.json'; // New version
+const CURRENT_FILE = 'vibetable_v9.json'; 
 async function loadData() {
     try {
-        // Try loading current version
         let q = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='" + CURRENT_FILE + "'";
         let r = await fetch(q, {headers:{'Authorization':'Bearer '+accessToken}});
         let d = await r.json();
@@ -205,7 +215,6 @@ async function loadData() {
             let f = await fetch(`https://www.googleapis.com/drive/v3/files/${d.files[0].id}?alt=media`, {headers:{'Authorization':'Bearer '+accessToken}});
             appData = await f.json();
         } else {
-            // FALLBACK: Try loading older version (v7 or v8) to migrate data
             console.log("New version not found, checking for old data...");
             let qOld = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='vibetable_v7.json'";
             let rOld = await fetch(qOld, {headers:{'Authorization':'Bearer '+accessToken}});
@@ -217,7 +226,6 @@ async function loadData() {
             }
         }
         
-        // Defaults for new features
         if(!appData.startHour) appData.startHour = 7;
         if(!appData.endHour) appData.endHour = 23;
         
@@ -229,8 +237,6 @@ async function saveDataToDrive() {
     let form = new FormData();
     form.append('metadata', new Blob([JSON.stringify({name:CURRENT_FILE, parents:['appDataFolder']})], {type:'application/json'}));
     form.append('file', blob);
-    // Note: This simplistic approach creates a NEW file every save. 
-    // Ideally we would update the existing ID, but for prototype reliability, this ensures the latest save is always on top.
     await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {method:'POST', headers:{'Authorization':'Bearer '+accessToken}, body:form});
 }
 
@@ -285,6 +291,6 @@ function renderNotes() { const list = document.getElementById('note-list'); cons
 function loadNote(i) { let n = appData.notes[i]; document.getElementById('note-title').value = n.title; document.getElementById('note-body').innerHTML = n.body; document.getElementById('note-group-select').value = n.group; document.getElementById('note-title').oninput = (e) => appData.notes[i].title = e.target.value; document.getElementById('note-group-select').onchange = (e) => { appData.notes[i].group = e.target.value; saveDataToDrive(); renderNotes(); }; document.getElementById('note-body').onblur = function() { appData.notes[i].body = this.innerHTML; saveDataToDrive(); }; }
 function filterNotes() { renderNotes(); }
 function updateNoteGroup() { /* Handled inline */ }
-function saveProfile() { appData.userName = document.getElementById('edit-name').value; saveDataToDrive(); updateProfileUI(); alert("Profile Saved"); }
+function saveProfile() { appData.userName = document.getElementById('edit-name').value; appData.userPic = document.getElementById('edit-pic').value || appData.userPic; saveDataToDrive(); updateProfileUI(); alert("Profile Saved"); }
 function updateProfileUI() { if(appData.userName) { document.getElementById('dash-name').innerText = appData.userName; document.getElementById('edit-name').value = appData.userName; } if(appData.userPic) { document.getElementById('sidebar-pic').src = appData.userPic; document.getElementById('profile-pic-large').src = appData.userPic; } if(appData.theme === 'dark') document.body.setAttribute('data-theme', 'dark'); }
 function toggleTheme() { if(document.body.hasAttribute('data-theme')) { document.body.removeAttribute('data-theme'); appData.theme = 'light'; } else { document.body.setAttribute('data-theme', 'dark'); appData.theme = 'dark'; } saveDataToDrive(); }
