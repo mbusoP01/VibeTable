@@ -25,54 +25,30 @@ body { margin: 0; font-family: 'Nunito', sans-serif; background-color: var(--bg-
 .btn-primary { background: var(--primary); color: #F7F1E1; border: none; padding: 12px 25px; border-radius: 50px; cursor: pointer; font-weight: 700; transition: 0.2s; }
 .nav-btn { background: transparent; border: none; padding: 15px 20px; width: 100%; text-align: left; color: var(--text-muted); cursor: pointer; font-weight: 700; display: flex; align-items: center; gap: 12px; border-radius: 20px; margin-bottom: 5px; }
 .nav-btn.active { background: var(--primary); color: #F7F1E1; }
+.bubble-input { width: 100%; padding: 15px; border: none; border-radius: 12px; background: rgba(255,255,255,0.5); font-size: 1rem; outline: none; margin-bottom: 10px; color: var(--text); }
 
-/* SMOOTH INPUTS & DROPDOWNS */
-.bubble-input { 
-    width: 100%; padding: 15px; border: none; 
-    border-radius: 12px; /* LESS BLOCKY */
-    background: rgba(255,255,255,0.5); 
-    font-size: 1rem; outline: none; margin-bottom: 10px; color: var(--text); 
-}
+/* PROFILE DRAG DROP */
+.profile-drop-zone { width: 140px; height: 140px; border-radius: 50%; border: 4px dashed var(--primary); position: relative; overflow: hidden; margin: 0 auto 20px auto; cursor: pointer; transition: 0.3s; }
+.profile-drop-zone img { width: 100%; height: 100%; object-fit: cover; }
+.drop-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); color: white; display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.2s; font-weight: bold; }
+.profile-drop-zone:hover .drop-overlay { opacity: 1; }
 
-/* HEATMAP */
-.heatmap-grid {
-    display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px;
-    margin-top: 10px;
-}
-.heat-day {
-    aspect-ratio: 1; border-radius: 5px; background: rgba(0,0,0,0.05);
-    display: flex; align-items: center; justify-content: center; font-size: 0.8rem;
-    position: relative;
-}
-.heat-level-1 { background: var(--hl-4); color: white; }
-.heat-level-2 { background: var(--accent); color: white; }
-
-/* FLASHCARD */
-.flashcard {
-    background-color: transparent; width: 100%; height: 200px;
-    perspective: 1000px; cursor: pointer; margin-bottom: 10px;
-}
-.card-inner {
-    position: relative; width: 100%; height: 100%; text-align: center;
-    transition: transform 0.6s; transform-style: preserve-3d;
-}
-.flashcard.flipped .card-inner { transform: rotateY(180deg); }
-.card-front, .card-back {
-    position: absolute; width: 100%; height: 100%;
-    -webkit-backface-visibility: hidden; backface-visibility: hidden;
-    display: flex; align-items: center; justify-content: center;
-    border-radius: 20px; font-size: 1.2rem; padding: 20px; box-sizing: border-box;
-    background: white; border: 2px solid var(--primary);
-}
-.card-back { background: var(--primary); color: white; transform: rotateY(180deg); }
-
-/* TIMETABLE */
-.timetable-grid { display: grid; grid-template-columns: 70px repeat(5, 1fr); gap: 6px; min-width: 800px; padding-bottom: 50px; }
+/* TIMETABLE ENHANCED */
+.timetable-wrapper { display: flex; flex-direction: column; align-items: center; width: 100%; }
+.add-row-btn { background: rgba(0,0,0,0.05); border: none; width: 100%; padding: 8px; cursor: pointer; color: var(--text-muted); font-weight: bold; border-radius: 10px; margin: 5px 0; transition: 0.2s; }
+.add-row-btn:hover { background: var(--primary); color: white; }
+.timetable-grid { display: grid; grid-template-columns: 70px repeat(5, 1fr); gap: 6px; min-width: 800px; padding-bottom: 20px; width: 100%; }
 .grid-header { text-align: center; font-weight: 800; color: var(--primary); }
 .time-slot { text-align: center; font-size: 0.8rem; color: var(--text-muted); align-self: center; }
 .class-slot { background: rgba(255,255,255,0.4); border-radius: 12px; min-height: 50px; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
 .class-slot input { position: relative; z-index: 10; width: 100%; height: 100%; border: none; background: transparent; text-align: center; font-weight: 600; color: var(--text); outline: none; }
 .color-dot { width: 25px; height: 25px; border-radius: 50%; cursor: pointer; border: 2px solid rgba(0,0,0,0.1); }
+
+/* ALARM BUTTON */
+.alarm-active { background-color: #d9534f !important; animation: pulse 2s infinite; }
+@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+/* NOTES & OTHER */
 .notepad-layout { display: grid; grid-template-columns: 260px 1fr; gap: 20px; height: 80vh; }
 .rich-editor { flex: 1; outline: none; padding: 20px; font-size: 1.1rem; line-height: 1.6; overflow-y: auto; background: rgba(255,255,255,0.3); border-radius: 15px; }
 .hl-btn { width: 25px; height: 25px; border-radius: 5px; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); }
@@ -81,8 +57,3 @@ body { margin: 0; font-family: 'Nunito', sans-serif; background-color: var(--bg-
 .picker-column::-webkit-scrollbar { display: none; }
 .picker-item { height: 40px; line-height: 40px; scroll-snap-align: center; opacity: 0.4; font-weight: 700; transition: 0.2s; }
 .picker-highlight { position: absolute; top: 70px; left: 10px; right: 10px; height: 40px; background: rgba(129, 117, 75, 0.2); border-radius: 10px; pointer-events: none; z-index: 1; border: 1px solid var(--primary); }
-/* PROFILE */
-.profile-drop-zone { width: 140px; height: 140px; border-radius: 50%; border: 4px dashed var(--primary); position: relative; overflow: hidden; margin: 0 auto 20px auto; cursor: pointer; transition: 0.3s; }
-.profile-drop-zone img { width: 100%; height: 100%; object-fit: cover; }
-.drop-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); color: white; display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.2s; font-weight: bold; }
-.profile-drop-zone:hover .drop-overlay { opacity: 1; }
