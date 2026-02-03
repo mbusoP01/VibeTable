@@ -7,54 +7,72 @@
     --bg-color: #2b2b1e; --sidebar-bg: #1f1f16; --glass: rgba(43, 43, 30, 0.8);
     --text: #F7F1E1; --text-muted: #CEC1A8; --primary: #B4833D;
 }
-body { margin: 0; font-family: 'Nunito', sans-serif; background-color: var(--bg-color); color: var(--text); height: 100vh; overflow: hidden; }
+body { margin: 0; font-family: 'Nunito', sans-serif; background-color: var(--bg-color); color: var(--text); height: 100vh; overflow-x: hidden; }
 
-/* GHOST FIX */
-#app-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; z-index: 100; background-color: var(--bg-color); }
+/* LAYOUT */
+#app-screen { position: relative; width: 100%; height: 100%; display: flex; background-color: var(--bg-color); overflow: hidden; }
 
-/* SIDEBAR & MOBILE LOGIC */
+/* SIDEBAR - DESKTOP */
 .sidebar { 
     width: 260px; background: var(--sidebar-bg); 
     display: flex; flex-direction: column; padding: 1.5rem; 
     border-right: 1px solid rgba(0,0,0,0.05); z-index: 200;
-    transition: transform 0.3s ease;
 }
+#mobile-menu-btn { display: none; }
+.close-btn { display: none; } /* Hidden on Desktop */
 
-#mobile-menu-btn { display: none; } 
-#mobile-overlay { display: none; }
-
-/* MOBILE SCREEN ADJUSTMENTS */
+/* --- MOBILE RESPONSIVE RULES --- */
 @media (max-width: 768px) {
+    /* 1. Sidebar becomes a Drawer */
     .sidebar {
-        position: absolute; height: 100%; 
-        width: 70vw; /* FIX: ONLY TAKE 70% WIDTH */
-        max-width: 280px;
-        transform: translateX(-100%);
-        box-shadow: 5px 0 15px rgba(0,0,0,0.1);
+        position: fixed; top: 0; left: 0; height: 100%;
+        width: 80%; max-width: 300px;
+        transform: translateX(-100%); /* Hidden by default */
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 5px 0 25px rgba(0,0,0,0.2);
     }
-    .sidebar.open { transform: translateX(0); }
-    
+    .sidebar.open { transform: translateX(0); } /* Slide in */
+
+    /* 2. Hamburger Button */
     #mobile-menu-btn {
-        display: block; position: absolute; top: 15px; left: 15px; z-index: 150;
-        background: var(--primary); color: white; border: none; padding: 10px 15px;
-        border-radius: 10px; cursor: pointer; font-size: 1.2rem;
+        display: flex; align-items: center; justify-content: center;
+        position: absolute; top: 20px; left: 20px; z-index: 150;
+        background: var(--primary); color: white; border: none;
+        width: 45px; height: 45px; border-radius: 12px;
+        font-size: 1.2rem; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
-    #close-sidebar-btn { display: block !important; }
+
+    /* 3. The Close 'X' Button */
+    .close-btn {
+        display: block !important;
+        background: transparent; border: none; font-size: 1.5rem;
+        color: var(--text); cursor: pointer; padding: 5px;
+    }
+
+    /* 4. Content Shrink & Fit */
+    .content { width: 100%; padding-top: 80px; /* Space for hamburger */ }
+    .tab-content { padding: 1.5rem; }
     
-    /* OVERLAY FIX */
+    /* Force grids to fit screen */
+    .timetable-grid { 
+        display: grid; 
+        grid-template-columns: 50px repeat(5, 1fr); /* Tighter columns */
+        gap: 2px; min-width: 100%; 
+        font-size: 0.8rem; /* Smaller text */
+    }
+    .grid-header { font-size: 0.7rem; }
+    .class-slot { min-height: 40px; border-radius: 8px; }
+    .notepad-layout { grid-template-columns: 1fr; gap: 20px; }
+    .note-sidebar { height: 200px; }
+    
+    /* Overlay Background */
     #mobile-overlay {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0,0,0,0.5); z-index: 190;
         display: none; opacity: 0; transition: opacity 0.3s;
+        backdrop-filter: blur(2px);
     }
     #mobile-overlay.open { display: block; opacity: 1; }
-
-    .content { padding-top: 60px; }
-    .tab-content { padding: 1.5rem; }
-    
-    .timetable-grid { min-width: 100%; overflow-x: auto; display: block; }
-    .notepad-layout { grid-template-columns: 1fr; }
-    .note-sidebar { height: 200px; margin-bottom: 20px; }
 }
 
 /* COMPONENTS */
@@ -63,36 +81,29 @@ body { margin: 0; font-family: 'Nunito', sans-serif; background-color: var(--bg-
 .tab-content.active { display: block !important; }
 
 .bubble { border-radius: 25px; }
-.bubble-right { border-top-right-radius: 30px; border-bottom-right-radius: 30px; }
 .glass-panel { background: var(--glass); border: 1px solid rgba(255,255,255,0.5); box-shadow: var(--shadow); padding: 2rem; margin-bottom: 20px; }
 .btn-primary { background: var(--primary); color: #F7F1E1; border: none; padding: 12px 25px; border-radius: 50px; cursor: pointer; font-weight: 700; transition: 0.2s; }
 .nav-btn { background: transparent; border: none; padding: 15px 20px; width: 100%; text-align: left; color: var(--text-muted); cursor: pointer; font-weight: 700; display: flex; align-items: center; gap: 12px; border-radius: 20px; margin-bottom: 5px; }
 .nav-btn.active { background: var(--primary); color: #F7F1E1; }
 .bubble-input { width: 100%; padding: 15px; border: none; border-radius: 12px; background: rgba(255,255,255,0.5); font-size: 1rem; outline: none; margin-bottom: 10px; color: var(--text); }
 
-/* PROFILE DRAG DROP */
-.profile-drop-zone { width: 140px; height: 140px; border-radius: 50%; border: 4px dashed var(--primary); position: relative; overflow: hidden; margin: 0 auto 20px auto; cursor: pointer; transition: 0.3s; }
-.profile-drop-zone img { width: 100%; height: 100%; object-fit: cover; }
-.drop-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); color: white; display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.2s; font-weight: bold; }
-.profile-drop-zone:hover .drop-overlay { opacity: 1; }
-
-/* TIMETABLE ENHANCED */
-.timetable-wrapper { display: flex; flex-direction: column; align-items: center; width: 100%; }
-.add-row-btn { background: rgba(0,0,0,0.05); border: none; width: 100%; padding: 8px; cursor: pointer; color: var(--text-muted); font-weight: bold; border-radius: 10px; margin: 5px 0; transition: 0.2s; }
-.add-row-btn:hover { background: var(--primary); color: white; }
-.timetable-grid { display: grid; grid-template-columns: 70px repeat(5, 1fr); gap: 6px; min-width: 800px; padding-bottom: 20px; width: 100%; }
+/* TIMETABLE */
+.timetable-wrapper { display: flex; flex-direction: column; align-items: center; width: 100%; overflow-x: auto; }
+.add-row-btn { background: rgba(0,0,0,0.05); border: none; width: 100%; padding: 10px; cursor: pointer; color: var(--text-muted); font-weight: bold; border-radius: 10px; margin: 5px 0; }
+.timetable-grid { display: grid; grid-template-columns: 70px repeat(5, 1fr); gap: 6px; min-width: 800px; padding-bottom: 20px; } /* Desktop Default */
 .grid-header { text-align: center; font-weight: 800; color: var(--primary); }
 .time-slot { text-align: center; font-size: 0.8rem; color: var(--text-muted); align-self: center; }
 .class-slot { background: rgba(255,255,255,0.4); border-radius: 12px; min-height: 50px; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
 .class-slot input { position: relative; z-index: 10; width: 100%; height: 100%; border: none; background: transparent; text-align: center; font-weight: 600; color: var(--text); outline: none; }
 .color-dot { width: 25px; height: 25px; border-radius: 50%; cursor: pointer; border: 2px solid rgba(0,0,0,0.1); }
 
-/* ALARM BUTTON */
+/* OTHER */
+.profile-drop-zone { width: 140px; height: 140px; border-radius: 50%; border: 4px dashed var(--primary); position: relative; overflow: hidden; margin: 0 auto 20px auto; cursor: pointer; transition: 0.3s; }
+.profile-drop-zone img { width: 100%; height: 100%; object-fit: cover; }
+.drop-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); color: white; display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.2s; font-weight: bold; }
+.profile-drop-zone:hover .drop-overlay { opacity: 1; }
 .alarm-active { background-color: #d9534f !important; animation: pulse 2s infinite; }
 @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-
-/* NOTES & OTHER */
-.notepad-layout { display: grid; grid-template-columns: 260px 1fr; gap: 20px; height: 80vh; }
 .rich-editor { flex: 1; outline: none; padding: 20px; font-size: 1.1rem; line-height: 1.6; overflow-y: auto; background: rgba(255,255,255,0.3); border-radius: 15px; }
 .hl-btn { width: 25px; height: 25px; border-radius: 5px; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); }
 .ios-picker-container { display: flex; justify-content: center; height: 180px; position: relative; overflow: hidden; background: rgba(255,255,255,0.3); border-radius: 20px; margin-top: 15px; }
