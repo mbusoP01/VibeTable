@@ -1,4 +1,4 @@
-/* VibeTable Logic */
+/* VibeTable Logic - Untis & Flashcards */
 
 const CLIENT_ID = '951024875343-365jk5cjfkjbg8co3elc75jn41pe0ama.apps.googleusercontent.com'; 
 const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile';
@@ -8,7 +8,9 @@ let appData = {
     events: [], 
     timetable: {}, timetableColors: {}, 
     startHour: 7, endHour: 23, 
-    notes: [], noteGroups: ['General', 'Law', 'Business']
+    showWeekends: false, // NEW
+    notes: [], noteGroups: ['Group 1', 'Group 2'],
+    flashcards: [] 
 };
 let accessToken = null;
 let selectedColor = null;
@@ -27,9 +29,12 @@ window.onload = function() {
     renderColorPickers();
     loadBibleQuote();
     setupDragDrop();
+    initHeatmap();
+    // Start Time Line Loop
+    setInterval(updateTimeLine, 60000); // Every minute
 };
 
-/* --- UI LOGIC --- */
+/* --- UI --- */
 function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('open');
     document.getElementById('mobile-overlay').classList.toggle('open');
@@ -50,25 +55,28 @@ function switchTab(tabId) {
         target.style.display = 'block';
         setTimeout(() => target.classList.add('active'), 10);
     }
-    if(tabId === 'timetable') renderTimetable();
+    if(tabId === 'timetable') { renderTimetable(); updateTimeLine(); }
     if(tabId === 'notes') renderNotes();
-    if(tabId === 'countdowns') renderEvents();
+    if(tabId === 'countdowns') { renderEvents(); initHeatmap(); }
+    if(tabId === 'study') renderFlashcard();
     if(tabId === 'profile') updateProfileUI();
 
-    // AUTO CLOSE SIDEBAR ON MOBILE
     if (window.innerWidth <= 768) {
         document.getElementById('sidebar').classList.remove('open');
         document.getElementById('mobile-overlay').classList.remove('open');
     }
 }
 
-/* --- DYNAMIC TIMETABLE --- */
+/* --- TIMETABLE (UNTIS STYLE) --- */
+function toggleWeekends() {
+    appData.showWeekends = !appData.showWeekends;
+    saveDataToDrive();
+    renderTimetable();
+}
+
 function extendTimetable(direction) {
-    if(direction === 'start') {
-        if(appData.startHour > 0) appData.startHour--;
-    } else {
-        if(appData.endHour < 24) appData.endHour++;
-    }
+    if(direction === 'start') { if(appData.startHour > 0) appData.startHour--; } 
+    else { if(appData.endHour < 24) appData.endHour++; }
     saveDataToDrive();
     renderTimetable();
 }
@@ -76,23 +84,38 @@ function extendTimetable(direction) {
 function renderTimetable() {
     const grid = document.getElementById('timetable-grid');
     if(!grid) return; grid.innerHTML = ''; 
-    const days = ['Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    
+    // Toggle Weekends Class
+    if(appData.showWeekends) grid.classList.add('show-weekends');
+    else grid.classList.remove('show-weekends');
+
+    const days = appData.showWeekends 
+        ? ['Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        : ['Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    
+    const cols = appData.showWeekends ? 7 : 5;
+
+    // Headers
     days.forEach(d => { 
         let div = document.createElement('div'); 
         div.className = 'grid-header'; 
         div.innerText = d; 
         grid.appendChild(div); 
     });
+    
+    // Rows
     for (let i = appData.startHour; i <= appData.endHour; i++) {
         let time = document.createElement('div'); 
         time.className = 'time-slot'; 
         time.innerText = `${i}:00`; 
         grid.appendChild(time);
-        for (let j = 0; j < 5; j++) {
+        
+        for (let j = 0; j < cols; j++) {
             let key = `${days[j+1]}-${i}`;
             let slot = document.createElement('div'); 
             slot.className = 'class-slot bubble';
             if(appData.timetableColors && appData.timetableColors[key]) slot.style.background = appData.timetableColors[key];
+            
             let input = document.createElement('input');
             input.value = appData.timetable[key] || ''; 
             input.placeholder = '+';
@@ -109,123 +132,110 @@ function renderTimetable() {
             grid.appendChild(slot);
         }
     }
+    updateTimeLine(); // Draw line immediately
 }
 
-/* --- ALARM --- */
-let timerInterval;
-let timerSeconds = 1500; 
-function updateTimerDisplay() {
-    let m = Math.floor(timerSeconds / 60);
-    let s = timerSeconds % 60;
-    document.getElementById('timer-display').innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+function updateTimeLine() {
+    const line = document.getElementById('current-time-line');
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMin = now.getMinutes();
+    
+    // Check if within view
+    if (currentHour < appData.startHour || currentHour > appData.endHour) {
+        line.style.display = 'none';
+        return;
+    }
+
+    const rowHeight = 61; // 60px height + 1px gap approx
+    const headerHeight = 40; // Height of header row
+    
+    // Calculate pixels down
+    const hoursPastStart = currentHour - appData.startHour;
+    const pixelsDown = headerHeight + (hoursPastStart * rowHeight) + ((currentMin / 60) * rowHeight);
+    
+    line.style.top = `${pixelsDown}px`;
+    line.style.display = 'block';
 }
-function startTimer() {
-    if(timerInterval) return;
-    document.getElementById('btn-start').classList.add('alarm-active');
-    timerInterval = setInterval(() => {
-        if(timerSeconds > 0) {
-            timerSeconds--;
-            updateTimerDisplay();
-        } else {
-            triggerAlarm();
-        }
-    }, 1000);
+
+/* --- FLASHCARDS --- */
+let currentCard = 0;
+function addFlashcard() {
+    let q = document.getElementById('fc-q').value;
+    let a = document.getElementById('fc-a').value;
+    if(q && a) {
+        if(!appData.flashcards) appData.flashcards = [];
+        appData.flashcards.push({q, a});
+        document.getElementById('fc-q').value = '';
+        document.getElementById('fc-a').value = '';
+        saveDataToDrive();
+        renderFlashcard();
+    }
 }
+function renderFlashcard() {
+    const front = document.getElementById('card-front-text');
+    const back = document.getElementById('card-back-text');
+    const counter = document.getElementById('card-counter');
+    if(!appData.flashcards || appData.flashcards.length === 0) {
+        front.innerText = "No cards yet."; back.innerText = "Add one below!"; counter.innerText = "0 / 0"; return;
+    }
+    if(currentCard >= appData.flashcards.length) currentCard = 0;
+    if(currentCard < 0) currentCard = appData.flashcards.length - 1;
+    front.innerText = appData.flashcards[currentCard].q;
+    back.innerText = appData.flashcards[currentCard].a;
+    counter.innerText = `${currentCard + 1} / ${appData.flashcards.length}`;
+    document.getElementById('flashcard-display').classList.remove('flipped');
+}
+function flipCard() { document.getElementById('flashcard-display').classList.toggle('flipped'); }
+function nextCard() { currentCard++; renderFlashcard(); }
+function prevCard() { currentCard--; renderFlashcard(); }
+
+/* --- HEATMAP --- */
+function initHeatmap() {
+    const grid = document.getElementById('heatmap-grid');
+    if(!grid) return; grid.innerHTML = '';
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    for(let i=1; i<=daysInMonth; i++) {
+        let dayDiv = document.createElement('div');
+        dayDiv.className = 'heat-day';
+        dayDiv.innerText = i;
+        let count = 0;
+        appData.events.forEach(e => { let d = new Date(e.date); if(d.getDate() === i && d.getMonth() === now.getMonth()) count++; });
+        if(count > 0) dayDiv.classList.add(count > 1 ? 'heat-level-2' : 'heat-level-1');
+        grid.appendChild(dayDiv);
+    }
+}
+
+/* --- TIMER & ALARM --- */
+let timerInterval; let timerSeconds = 1500; 
+function updateTimerDisplay() { let m = Math.floor(timerSeconds / 60); let s = timerSeconds % 60; document.getElementById('timer-display').innerText = `${m}:${s < 10 ? '0' : ''}${s}`; }
+function startTimer() { if(timerInterval) return; document.getElementById('btn-start').classList.add('alarm-active'); timerInterval = setInterval(() => { if(timerSeconds > 0) { timerSeconds--; updateTimerDisplay(); } else { triggerAlarm(); } }, 1000); }
 function pauseTimer() { clearInterval(timerInterval); timerInterval = null; document.getElementById('btn-start').classList.remove('alarm-active'); }
 function resetTimer() { pauseTimer(); timerSeconds = 1500; updateTimerDisplay(); }
 function requestNotification() { if (Notification.permission !== "granted") Notification.requestPermission(); audio.play().then(() => audio.pause()); }
-function triggerAlarm() {
-    clearInterval(timerInterval);
-    document.getElementById('btn-start').classList.remove('alarm-active');
-    audio.currentTime = 0; audio.play();
-    setTimeout(() => audio.play(), 1000); setTimeout(() => audio.play(), 2000);
-    if (Notification.permission === "granted") new Notification("VibeTable: Time is up!"); else alert("TIME IS UP!");
-}
+function triggerAlarm() { clearInterval(timerInterval); document.getElementById('btn-start').classList.remove('alarm-active'); audio.currentTime = 0; audio.play(); setTimeout(() => audio.play(), 1000); setTimeout(() => audio.play(), 2000); if (Notification.permission === "granted") new Notification("VibeTable: Time is up!"); else alert("TIME IS UP!"); }
 
 /* --- AUTH & DATA --- */
 function initGoogleAuth() { try { tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: async (r) => { if(r.access_token) { accessToken = r.access_token; await handleLogin(); } } }); } catch(e) {} }
 function handleAuthClick() { tokenClient.requestAccessToken(); }
 async function handleLogin() {
-    const login = document.getElementById('login-screen');
-    if(login) login.remove(); 
-    document.getElementById('app-screen').classList.remove('hidden');
-    document.getElementById('app-screen').classList.add('active');
+    const login = document.getElementById('login-screen'); if(login) login.remove(); 
+    document.getElementById('app-screen').classList.remove('hidden'); document.getElementById('app-screen').classList.add('active');
     let res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {headers:{'Authorization':'Bearer '+accessToken}});
     let user = await res.json();
-    const sidebarPic = document.getElementById('sidebar-pic');
-    const profilePic = document.getElementById('profile-pic-large');
-    if(sidebarPic) sidebarPic.src = user.picture;
-    if(profilePic) profilePic.src = user.picture;
+    const sidebarPic = document.getElementById('sidebar-pic'); const profilePic = document.getElementById('profile-pic-large');
+    if(sidebarPic) sidebarPic.src = user.picture; if(profilePic) profilePic.src = user.picture;
     await loadData();
     if(appData.userName) document.getElementById('dash-name').innerText = appData.userName;
     else document.getElementById('dash-name').innerText = user.given_name;
-    renderGroups(); renderTimetable(); renderEvents(); renderNotes(); updateProfileUI();
+    renderGroups(); renderTimetable(); renderEvents(); renderNotes(); updateProfileUI(); initHeatmap();
 }
-const CURRENT_FILE = 'vibetable_v9.json'; 
-async function loadData() {
-    try {
-        let q = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='" + CURRENT_FILE + "'";
-        let r = await fetch(q, {headers:{'Authorization':'Bearer '+accessToken}});
-        let d = await r.json();
-        if(d.files && d.files.length > 0) {
-            let f = await fetch(`https://www.googleapis.com/drive/v3/files/${d.files[0].id}?alt=media`, {headers:{'Authorization':'Bearer '+accessToken}});
-            appData = await f.json();
-        } else {
-            let qOld = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='vibetable_v7.json'";
-            let rOld = await fetch(qOld, {headers:{'Authorization':'Bearer '+accessToken}});
-            let dOld = await rOld.json();
-            if(dOld.files && dOld.files.length > 0) {
-                let fOld = await fetch(`https://www.googleapis.com/drive/v3/files/${dOld.files[0].id}?alt=media`, {headers:{'Authorization':'Bearer '+accessToken}});
-                appData = await fOld.json();
-            }
-        }
-        if(!appData.startHour) appData.startHour = 7;
-        if(!appData.endHour) appData.endHour = 23;
-    } catch(e) { console.error(e); }
-}
-async function saveDataToDrive() {
-    let blob = new Blob([JSON.stringify(appData)], {type:'application/json'});
-    let form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify({name:CURRENT_FILE, parents:['appDataFolder']})], {type:'application/json'}));
-    form.append('file', blob);
-    await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {method:'POST', headers:{'Authorization':'Bearer '+accessToken}, body:form});
-}
-function setupDragDrop() {
-    const zone = document.getElementById('drop-zone');
-    if(!zone) return;
-    zone.ondragover = (e) => { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; };
-    zone.ondragleave = (e) => { e.preventDefault(); zone.style.borderColor = 'var(--primary)'; };
-    zone.ondrop = (e) => {
-        e.preventDefault();
-        zone.style.borderColor = 'var(--primary)';
-        const file = e.dataTransfer.files[0];
-        if(file && file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                appData.userPic = event.target.result;
-                updateProfileUI();
-                saveDataToDrive();
-                alert("Profile picture updated!");
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-}
-function renderColorPickers() {
-    const c = document.getElementById('timetable-colors');
-    const h = document.getElementById('highlighter-toolbar');
-    if(!c) return; c.innerHTML = ''; h.innerHTML = '';
-    palette.forEach(col => {
-        let dot = document.createElement('div');
-        dot.className = 'color-dot'; dot.style.background = col;
-        dot.onclick = () => { selectedColor = col; };
-        c.appendChild(dot);
-        let hl = document.createElement('div');
-        hl.className = 'hl-btn'; hl.style.background = col;
-        hl.onmousedown = (e) => { e.preventDefault(); document.execCommand('hiliteColor', false, col); };
-        h.appendChild(hl);
-    });
-}
+const CURRENT_FILE = 'vibetable_v10.json'; 
+async function loadData() { try { let q = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='" + CURRENT_FILE + "'"; let r = await fetch(q, {headers:{'Authorization':'Bearer '+accessToken}}); let d = await r.json(); if(d.files && d.files.length > 0) { let f = await fetch(`https://www.googleapis.com/drive/v3/files/${d.files[0].id}?alt=media`, {headers:{'Authorization':'Bearer '+accessToken}}); appData = await f.json(); } else { let qOld = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='vibetable_v9.json'"; let rOld = await fetch(qOld, {headers:{'Authorization':'Bearer '+accessToken}}); let dOld = await rOld.json(); if(dOld.files && dOld.files.length > 0) { let fOld = await fetch(`https://www.googleapis.com/drive/v3/files/${dOld.files[0].id}?alt=media`, {headers:{'Authorization':'Bearer '+accessToken}}); appData = await fOld.json(); } } if(!appData.startHour) appData.startHour = 7; if(!appData.endHour) appData.endHour = 23; } catch(e) { console.error(e); } }
+async function saveDataToDrive() { let blob = new Blob([JSON.stringify(appData)], {type:'application/json'}); let form = new FormData(); form.append('metadata', new Blob([JSON.stringify({name:CURRENT_FILE, parents:['appDataFolder']})], {type:'application/json'})); form.append('file', blob); await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {method:'POST', headers:{'Authorization':'Bearer '+accessToken}, body:form}); }
+function setupDragDrop() { const zone = document.getElementById('drop-zone'); if(!zone) return; zone.ondragover = (e) => { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; }; zone.ondragleave = (e) => { e.preventDefault(); zone.style.borderColor = 'var(--primary)'; }; zone.ondrop = (e) => { e.preventDefault(); zone.style.borderColor = 'var(--primary)'; const file = e.dataTransfer.files[0]; if(file && file.type.startsWith('image/')) { const reader = new FileReader(); reader.onload = (event) => { appData.userPic = event.target.result; updateProfileUI(); saveDataToDrive(); alert("Profile picture updated!"); }; reader.readAsDataURL(file); } }; }
+function renderColorPickers() { const c = document.getElementById('timetable-colors'); const h = document.getElementById('highlighter-toolbar'); if(!c) return; c.innerHTML = ''; h.innerHTML = ''; palette.forEach(col => { let dot = document.createElement('div'); dot.className = 'color-dot'; dot.style.background = col; dot.onclick = () => { selectedColor = col; }; c.appendChild(dot); let hl = document.createElement('div'); hl.className = 'hl-btn'; hl.style.background = col; hl.onmousedown = (e) => { e.preventDefault(); document.execCommand('hiliteColor', false, col); }; h.appendChild(hl); }); }
 function initScrollPickers() { populateWheel('picker-day', 1, 31); populateWheel('picker-month', 1, 12); populateWheel('picker-year', 2025, 2030); populateWheel('picker-hour', 0, 23); populateWheel('picker-minute', 0, 59); }
 function populateWheel(id, min, max) { const el = document.getElementById(id); if(!el) return; el.innerHTML = '<div style="height:70px; width:100%"></div>'; for(let i=min; i<=max; i++) { let item = document.createElement('div'); item.className = 'picker-item'; item.innerText = i < 10 ? '0'+i : i; item.dataset.val = i; el.appendChild(item); } el.innerHTML += '<div style="height:70px; width:100%"></div>'; }
 function getWheelVal(id) { const el = document.getElementById(id); if(!el) return 0; let index = Math.round(el.scrollTop / 40); let target = el.children[index + 1]; return target ? parseInt(target.dataset.val) : 0; }
