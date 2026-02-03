@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VibeTable | Student Zen</title>
+    <title>VibeTable | Student OS</title>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
@@ -21,7 +21,6 @@
     </div>
 
     <div id="app-screen" class="screen hidden">
-        
         <button id="mobile-menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
 
         <nav class="sidebar bubble-right" id="sidebar">
@@ -31,18 +30,14 @@
                 </div>
                 <button onclick="toggleSidebar()" class="close-btn"><i class="fas fa-times"></i></button>
             </div>
-            
             <button class="nav-btn active" onclick="switchTab('dashboard')"><i class="fas fa-home"></i> Dashboard</button>
             <button class="nav-btn" onclick="switchTab('timetable')"><i class="fas fa-calendar-alt"></i> Timetable</button>
             <button class="nav-btn" onclick="switchTab('countdowns')"><i class="fas fa-hourglass-half"></i> Countdowns</button>
             <button class="nav-btn" onclick="switchTab('study')"><i class="fas fa-graduation-cap"></i> Focus & Alarm</button>
             <button class="nav-btn" onclick="switchTab('notes')"><i class="fas fa-book-open"></i> Notes</button>
-            
             <div style="flex-grow: 1;"></div> 
-            
             <button class="nav-btn" onclick="switchTab('profile')">
-                <img id="sidebar-pic" src="" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary);">
-                Profile
+                <img id="sidebar-pic" src="" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary);"> Profile
             </button>
             <button class="nav-btn" onclick="location.reload()" style="color: #d9534f;"><i class="fas fa-sign-out-alt"></i> Sign Out</button>
         </nav>
@@ -50,11 +45,26 @@
         <div id="mobile-overlay" onclick="toggleSidebar()"></div>
 
         <main class="content">
+            
             <section id="dashboard" class="tab-content active">
-                <div class="welcome-header"><h2>Hello, <span id="dash-name">Student</span>.</h2></div>
-                <div class="glass-panel bubble" style="margin-top: 20px; text-align: center; padding: 3rem;">
-                    <h3><i class="fas fa-bible"></i> Daily Word</h3>
-                    <p id="daily-quote" style="font-style: italic; font-size: 1.3rem; margin-top: 1rem;">"Loading..."</p>
+                <div class="welcome-header">
+                    <h2 id="greet-msg">Hello, Student.</h2>
+                    <p style="color: var(--text-muted);">Welcome to your study space.</p>
+                </div>
+                
+                <div class="dashboard-grid">
+                    <div class="glass-panel bubble" style="border-left: 5px solid var(--accent);">
+                        <h3><i class="fas fa-forward"></i> Up Next</h3>
+                        <div id="up-next-display" style="font-size: 1.2rem; font-weight: bold; margin-top: 10px;">
+                            Checking schedule...
+                        </div>
+                        <p id="up-next-sub" style="font-size: 0.9rem; color: var(--text-muted);">Relax for now.</p>
+                    </div>
+
+                    <div class="glass-panel bubble">
+                        <h3><i class="fas fa-bible"></i> Daily Word</h3>
+                        <p id="daily-quote" style="font-style: italic; font-size: 1.1rem; margin-top: 10px; line-height: 1.6;">"Loading..."</p>
+                    </div>
                 </div>
             </section>
 
@@ -69,50 +79,19 @@
                 </div>
                 
                 <div class="timetable-wrapper" id="timetable-container">
-                    <button class="add-row-btn" onclick="extendTimetable('start')"><i class="fas fa-arrow-up"></i> Earlier</button>
-                    
+                    <div style="display: flex; gap: 5px; width: 100%; margin: 5px 0;">
+                        <button class="add-row-btn" style="flex: 1;" onclick="modifyTimetable('start', 'add')"><i class="fas fa-plus"></i> Earlier</button>
+                        <button class="add-row-btn" style="width: 50px; background: #d9534f; color: white;" onclick="modifyTimetable('start', 'remove')"><i class="fas fa-minus"></i></button>
+                    </div>
+
                     <div style="position: relative;">
                         <div id="current-time-line"></div>
                         <div class="timetable-grid" id="timetable-grid"></div>
                     </div>
 
-                    <button class="add-row-btn" onclick="extendTimetable('end')"><i class="fas fa-arrow-down"></i> Later</button>
-                </div>
-            </section>
-
-            <section id="study" class="tab-content">
-                <h2>Study Tools</h2>
-                <div class="notepad-layout" style="grid-template-columns: 1fr 1fr;">
-                    
-                    <div class="glass-panel bubble" style="display: flex; flex-direction: column;">
-                        <h3><i class="fas fa-layer-group"></i> Flashcards</h3>
-                        <div id="flashcard-display" class="flashcard" onclick="flipCard()">
-                            <div class="card-inner">
-                                <div class="card-front"><p id="card-front-text">Create a card!</p></div>
-                                <div class="card-back"><p id="card-back-text">Answer here.</p></div>
-                            </div>
-                        </div>
-                        <div style="display: flex; gap: 10px; justify-content: center; margin: 10px 0;">
-                            <button class="btn-primary" onclick="prevCard()"><</button>
-                            <span id="card-counter" style="align-self: center; font-weight: bold;">0 / 0</span>
-                            <button class="btn-primary" onclick="nextCard()">></button>
-                        </div>
-                        <div style="margin-top: auto; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 10px;">
-                            <input type="text" id="fc-q" class="bubble-input" placeholder="Question" style="padding: 8px;">
-                            <input type="text" id="fc-a" class="bubble-input" placeholder="Answer" style="padding: 8px;">
-                            <button class="btn-primary" style="width: 100%;" onclick="addFlashcard()">Add</button>
-                        </div>
-                    </div>
-
-                    <div class="glass-panel bubble" style="text-align: center;">
-                        <h3><i class="fas fa-clock"></i> Focus & Alarm</h3>
-                        <div id="timer-display" style="font-size: 3.5rem; font-weight: 800; color: var(--text); margin: 20px 0;">25:00</div>
-                        <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
-                            <button class="btn-primary" onclick="startTimer()" id="btn-start">Start</button>
-                            <button class="btn-primary" style="background: var(--text-muted);" onclick="pauseTimer()">Pause</button>
-                            <button class="btn-primary" style="background: #d9534f;" onclick="resetTimer()">Reset</button>
-                        </div>
-                        <button class="nav-btn" onclick="requestNotification()" style="justify-content: center; background: rgba(0,0,0,0.05);"><i class="fas fa-bell"></i> Enable Sound</button>
+                    <div style="display: flex; gap: 5px; width: 100%; margin: 5px 0;">
+                        <button class="add-row-btn" style="flex: 1;" onclick="modifyTimetable('end', 'add')"><i class="fas fa-plus"></i> Later</button>
+                        <button class="add-row-btn" style="width: 50px; background: #d9534f; color: white;" onclick="modifyTimetable('end', 'remove')"><i class="fas fa-minus"></i></button>
                     </div>
                 </div>
             </section>
@@ -139,6 +118,41 @@
                     <button class="btn-primary" style="width: 100%; margin-top: 20px;" onclick="addEvent()">Create Countdown</button>
                 </div>
                 <div id="countdown-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;"></div>
+            </section>
+
+            <section id="study" class="tab-content">
+                <h2>Study Tools</h2>
+                <div class="notepad-layout" style="grid-template-columns: 1fr 1fr;">
+                    <div class="glass-panel bubble" style="display: flex; flex-direction: column;">
+                        <h3><i class="fas fa-layer-group"></i> Flashcards</h3>
+                        <div id="flashcard-display" class="flashcard" onclick="flipCard()">
+                            <div class="card-inner">
+                                <div class="card-front"><p id="card-front-text">Create a card!</p></div>
+                                <div class="card-back"><p id="card-back-text">Answer here.</p></div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px; justify-content: center; margin: 10px 0;">
+                            <button class="btn-primary" onclick="prevCard()"><</button>
+                            <span id="card-counter" style="align-self: center; font-weight: bold;">0 / 0</span>
+                            <button class="btn-primary" onclick="nextCard()">></button>
+                        </div>
+                        <div style="margin-top: auto; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 10px;">
+                            <input type="text" id="fc-q" class="bubble-input" placeholder="Question" style="padding: 8px;">
+                            <input type="text" id="fc-a" class="bubble-input" placeholder="Answer" style="padding: 8px;">
+                            <button class="btn-primary" style="width: 100%;" onclick="addFlashcard()">Add</button>
+                        </div>
+                    </div>
+                    <div class="glass-panel bubble" style="text-align: center;">
+                        <h3><i class="fas fa-clock"></i> Focus & Alarm</h3>
+                        <div id="timer-display" style="font-size: 3.5rem; font-weight: 800; color: var(--text); margin: 20px 0;">25:00</div>
+                        <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
+                            <button class="btn-primary" onclick="startTimer()" id="btn-start">Start</button>
+                            <button class="btn-primary" style="background: var(--text-muted);" onclick="pauseTimer()">Pause</button>
+                            <button class="btn-primary" style="background: #d9534f;" onclick="resetTimer()">Reset</button>
+                        </div>
+                        <button class="nav-btn" onclick="requestNotification()" style="justify-content: center; background: rgba(0,0,0,0.05);"><i class="fas fa-bell"></i> Enable Sound</button>
+                    </div>
+                </div>
             </section>
 
             <section id="notes" class="tab-content">
