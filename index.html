@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>VibeTable | Student Zen</title>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -26,9 +26,13 @@
         </button>
 
         <nav class="sidebar bubble-right" id="sidebar">
-            <div class="brand" style="font-size: 1.5rem; font-weight: 800; color: var(--primary); margin-bottom: 2rem; display: flex; align-items: center; gap: 10px;">
-                <i class="fas fa-seedling"></i> VibeTable
-                <button onclick="toggleSidebar()" style="margin-left:auto; background:none; border:none; font-size:1.2rem; color:var(--text-muted); display:none;" id="close-sidebar-btn"><i class="fas fa-times"></i></button>
+            <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <div class="brand" style="font-size: 1.5rem; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-seedling"></i> VibeTable
+                </div>
+                <button onclick="toggleSidebar()" class="close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
             
             <button class="nav-btn active" onclick="switchTab('dashboard')"><i class="fas fa-home"></i> Dashboard</button>
@@ -68,9 +72,9 @@
                     </div>
                 </div>
                 <div class="timetable-wrapper">
-                    <button class="add-row-btn" onclick="extendTimetable('start')"><i class="fas fa-arrow-up"></i> Add Earlier Hour</button>
+                    <button class="add-row-btn" onclick="extendTimetable('start')"><i class="fas fa-arrow-up"></i> Add Earlier</button>
                     <div class="timetable-grid" id="timetable-grid"></div>
-                    <button class="add-row-btn" onclick="extendTimetable('end')"><i class="fas fa-arrow-down"></i> Add Later Hour</button>
+                    <button class="add-row-btn" onclick="extendTimetable('end')"><i class="fas fa-arrow-down"></i> Add Later</button>
                 </div>
             </section>
 
@@ -96,19 +100,17 @@
 
             <section id="study" class="tab-content">
                 <h2>Focus & Alarm</h2>
-                <div class="notepad-layout" style="grid-template-columns: 1fr;">
-                    <div class="glass-panel bubble" style="text-align: center;">
-                        <h3><i class="fas fa-clock"></i> Focus Timer / Alarm</h3>
-                        <div id="timer-display" style="font-size: 4rem; font-weight: 800; color: var(--text); margin: 20px 0;">25:00</div>
-                        <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
-                            <button class="btn-primary" onclick="startTimer()" id="btn-start">Start</button>
-                            <button class="btn-primary" style="background: var(--text-muted);" onclick="pauseTimer()">Pause</button>
-                            <button class="btn-primary" style="background: #d9534f;" onclick="resetTimer()">Reset</button>
-                        </div>
-                        <button class="nav-btn" onclick="requestNotification()" style="justify-content: center; background: rgba(0,0,0,0.05);">
-                            <i class="fas fa-bell"></i> Enable Sound Alarm
-                        </button>
+                <div class="glass-panel bubble" style="text-align: center;">
+                    <h3><i class="fas fa-clock"></i> Focus Timer</h3>
+                    <div id="timer-display" style="font-size: 3.5rem; font-weight: 800; color: var(--text); margin: 20px 0;">25:00</div>
+                    <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
+                        <button class="btn-primary" onclick="startTimer()" id="btn-start">Start</button>
+                        <button class="btn-primary" style="background: var(--text-muted);" onclick="pauseTimer()">Pause</button>
+                        <button class="btn-primary" style="background: #d9534f;" onclick="resetTimer()">Reset</button>
                     </div>
+                    <button class="nav-btn" onclick="requestNotification()" style="justify-content: center; background: rgba(0,0,0,0.05);">
+                        <i class="fas fa-bell"></i> Enable Sound Alarm
+                    </button>
                 </div>
             </section>
 
