@@ -9,7 +9,7 @@
 }
 body { margin: 0; font-family: 'Nunito', sans-serif; background-color: var(--bg-color); color: var(--text); height: 100vh; overflow-x: hidden; }
 
-/* GHOST FIX */
+/* LAYOUT & GHOST FIX */
 #app-screen { position: relative; width: 100%; height: 100%; display: flex; background-color: var(--bg-color); overflow: hidden; }
 
 /* SIDEBAR - DESKTOP */
@@ -18,14 +18,12 @@ body { margin: 0; font-family: 'Nunito', sans-serif; background-color: var(--bg-
     display: flex; flex-direction: column; padding: 1.5rem; 
     border-right: 1px solid rgba(0,0,0,0.05); z-index: 200;
 }
-#mobile-menu-btn { display: none; }
-.close-btn { display: none; } 
+#mobile-menu-btn, .close-btn { display: none; }
 
 /* --- MOBILE RULES --- */
 @media (max-width: 768px) {
     .sidebar {
-        position: fixed; top: 0; left: 0; height: 100%;
-        width: 80%; max-width: 300px;
+        position: fixed; top: 0; left: 0; height: 100%; width: 80%; max-width: 300px;
         transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         box-shadow: 5px 0 25px rgba(0,0,0,0.2);
     }
@@ -39,7 +37,6 @@ body { margin: 0; font-family: 'Nunito', sans-serif; background-color: var(--bg-
     .close-btn { display: block !important; background: transparent; border: none; font-size: 1.5rem; color: var(--text); cursor: pointer; padding: 5px; }
     .content { width: 100%; padding-top: 80px; }
     .tab-content { padding: 1.5rem; }
-    .timetable-grid { font-size: 0.8rem; }
     .notepad-layout { grid-template-columns: 1fr; gap: 20px; }
     #mobile-overlay {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -61,67 +58,55 @@ body { margin: 0; font-family: 'Nunito', sans-serif; background-color: var(--bg-
 .nav-btn.active { background: var(--primary); color: #F7F1E1; }
 .bubble-input { width: 100%; padding: 15px; border: none; border-radius: 12px; background: rgba(255,255,255,0.5); font-size: 1rem; outline: none; margin-bottom: 10px; color: var(--text); }
 
-/* --- TIMETABLE (UNTIS STYLE) --- */
+/* --- TIMETABLE FIXED --- */
 .timetable-wrapper { display: flex; flex-direction: column; align-items: center; width: 100%; overflow-x: auto; position: relative; }
 .add-row-btn { background: rgba(0,0,0,0.05); border: none; width: 100%; padding: 10px; cursor: pointer; color: var(--text-muted); font-weight: bold; border-radius: 10px; margin: 5px 0; }
 
 .timetable-grid { 
     display: grid; 
-    /* Default 5 Days */
     grid-template-columns: 60px repeat(5, 1fr); 
-    gap: 1px; /* Tighter gap for Untis look */
-    min-width: 800px; /* Ensure scrolling on mobile */
-    padding-bottom: 20px; 
-    background: rgba(0,0,0,0.1); /* Grid line color */
+    gap: 1px; min-width: 800px; padding-bottom: 20px; 
+    background: rgba(0,0,0,0.1); 
     border: 1px solid rgba(0,0,0,0.1);
 }
-/* 7 Day Mode */
-.timetable-grid.show-weekends {
-    grid-template-columns: 60px repeat(7, 1fr); 
+.timetable-grid.show-weekends { grid-template-columns: 60px repeat(7, 1fr); }
+
+/* STICKY COLUMN MAGIC */
+.grid-header { background: var(--bg-color); text-align: center; font-weight: 800; color: var(--primary); padding: 10px; }
+.time-slot { 
+    background: var(--bg-color); text-align: center; font-size: 0.8rem; color: var(--text-muted); 
+    display: flex; align-items: center; justify-content: center; height: 60px; 
+}
+/* The "Sticky" Class applied via JS to the first column */
+.sticky-col {
+    position: sticky; left: 0; z-index: 20;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+    background-color: var(--bg-color);
 }
 
-.grid-header { background: var(--bg-color); text-align: center; font-weight: 800; color: var(--primary); padding: 10px; }
-.time-slot { background: var(--bg-color); text-align: center; font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; justify-content: center; height: 60px; /* FIXED HEIGHT FOR RED LINE CALC */ }
-.class-slot { 
-    background: rgba(255,255,255,0.6); 
-    height: 60px; /* Match time slot */
-    display: flex; align-items: center; justify-content: center; 
-    position: relative; cursor: pointer; 
-}
+.class-slot { background: rgba(255,255,255,0.6); height: 60px; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
 .class-slot input { position: relative; z-index: 10; width: 100%; height: 100%; border: none; background: transparent; text-align: center; font-weight: 600; color: var(--text); outline: none; }
 .color-dot { width: 25px; height: 25px; border-radius: 50%; cursor: pointer; border: 2px solid rgba(0,0,0,0.1); }
 
-/* --- CURRENT TIME LINE (RED LINE) --- */
+/* CURRENT TIME LINE */
 #current-time-line {
-    position: absolute;
-    left: 60px; /* Skip time column */
-    right: 0;
-    height: 2px;
-    background-color: red;
-    z-index: 50;
-    pointer-events: none;
-    display: none; /* Hidden by default until calculated */
+    position: absolute; left: 60px; right: 0; height: 2px; background-color: #d9534f;
+    z-index: 50; pointer-events: none; display: none;
 }
 #current-time-line::before {
-    content: '';
-    position: absolute; left: -5px; top: -4px;
-    width: 10px; height: 10px; border-radius: 50%; background: red;
+    content: ''; position: absolute; left: -5px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #d9534f;
 }
 
-/* FLASHCARDS */
+/* OTHER FEATURES */
 .flashcard { background-color: transparent; width: 100%; height: 200px; perspective: 1000px; cursor: pointer; margin-bottom: 10px; }
 .card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; }
 .flashcard.flipped .card-inner { transform: rotateY(180deg); }
 .card-front, .card-back { position: absolute; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; border-radius: 20px; font-size: 1.2rem; padding: 20px; box-sizing: border-box; background: white; border: 2px solid var(--primary); }
 .card-back { background: var(--primary); color: white; transform: rotateY(180deg); }
-
-/* HEATMAP */
 .heatmap-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 10px; }
 .heat-day { aspect-ratio: 1; border-radius: 5px; background: rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; position: relative; }
 .heat-level-1 { background: var(--hl-4); color: white; }
 .heat-level-2 { background: var(--accent); color: white; }
-
-/* OTHER */
 .profile-drop-zone { width: 140px; height: 140px; border-radius: 50%; border: 4px dashed var(--primary); position: relative; overflow: hidden; margin: 0 auto 20px auto; cursor: pointer; transition: 0.3s; }
 .profile-drop-zone img { width: 100%; height: 100%; object-fit: cover; }
 .drop-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); color: white; display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.2s; font-weight: bold; }
