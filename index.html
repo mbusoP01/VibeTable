@@ -21,7 +21,6 @@
     <div id="login-screen" class="screen" style="position: absolute; z-index: 999; background: #F7F1E1; width:100%; height:100%; display:flex; align-items:center; justify-content:center;">
         <div class="glass-card bubble" style="padding: 3rem; text-align: center;">
             <h1 style="color: var(--primary); font-size: 2.5rem;"><i class="fas fa-leaf"></i> VibeTable</h1>
-            <p style="margin-bottom: 2rem;">Your earthy, organized student space.</p>
             <button class="btn-primary" onclick="handleAuthClick()"><i class="fab fa-google"></i> Login</button>
         </div>
     </div>
@@ -35,13 +34,15 @@
                 <button onclick="toggleSidebar()" class="close-btn"><i class="fas fa-times"></i></button>
             </div>
             <div id="sync-status" class="status-badge offline" onclick="handleAuthClick()"><i class="fas fa-cloud-upload-alt"></i> <span>Offline Mode</span></div>
-            <button class="nav-btn active" onclick="switchTab('dashboard')"><i class="fas fa-home"></i> Dashboard</button>
-            <button class="nav-btn" onclick="switchTab('timetable')"><i class="fas fa-calendar-alt"></i> Timetable</button>
-            <button class="nav-btn" onclick="switchTab('countdowns')"><i class="fas fa-hourglass-half"></i> Countdowns</button>
-            <button class="nav-btn" onclick="switchTab('study')"><i class="fas fa-graduation-cap"></i> Study Tools</button>
-            <button class="nav-btn" onclick="switchTab('notes')"><i class="fas fa-book-open"></i> Notes</button>
+            
+            <button id="btn-dashboard" class="nav-btn active" onclick="switchTab('dashboard')"><i class="fas fa-home"></i> Dashboard</button>
+            <button id="btn-timetable" class="nav-btn" onclick="switchTab('timetable')"><i class="fas fa-calendar-alt"></i> Timetable</button>
+            <button id="btn-countdowns" class="nav-btn" onclick="switchTab('countdowns')"><i class="fas fa-hourglass-half"></i> Countdowns</button>
+            <button id="btn-study" class="nav-btn" onclick="switchTab('study')"><i class="fas fa-graduation-cap"></i> Study Tools</button>
+            <button id="btn-notes" class="nav-btn" onclick="switchTab('notes')"><i class="fas fa-book-open"></i> Notes</button>
+            
             <div style="flex-grow: 1;"></div> 
-            <button class="nav-btn" onclick="switchTab('profile')">
+            <button id="btn-profile" class="nav-btn" onclick="switchTab('profile')">
                 <img id="sidebar-pic" src="" class="profile-thumb"> Profile
             </button>
         </nav>
@@ -49,6 +50,8 @@
         <div id="mobile-overlay" onclick="toggleSidebar()"></div>
 
         <main class="content">
+            <button id="desktop-menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+
             <section id="dashboard" class="tab-content active">
                 <div class="welcome-header"><h2 id="greet-msg">Hello.</h2></div>
                 <div class="glass-panel bubble" style="padding: 15px; margin-bottom: 20px;">
@@ -108,37 +111,25 @@
 
             <section id="study" class="tab-content">
                 <h2>Study Tools</h2>
-                
                 <div class="glass-panel bubble" style="margin-bottom: 20px;">
                     <h3><i class="fas fa-calculator"></i> Grade Pulse (Advanced)</h3>
                     <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">Add your assignments/tests to see what you need on the Final.</p>
-                    
-                    <div id="assessment-list">
-                        </div>
-                    
+                    <div id="assessment-list"></div>
                     <button class="btn-small" onclick="addAssessmentRow()" style="width: 100%; margin-top: 10px; background: rgba(0,0,0,0.05); color: var(--text);">+ Add Assessment</button>
-                    
                     <hr style="border: 0; border-top: 1px solid rgba(0,0,0,0.1); margin: 15px 0;">
-                    
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <span>Target:</span>
                         <select id="grade-target" class="bubble-input" style="width: 120px; margin: 0; padding: 5px;">
-                            <option value="50">Pass (50%)</option>
-                            <option value="75" selected>Distinction (75%)</option>
+                            <option value="50">Pass (50%)</option><option value="75" selected>Distinction (75%)</option>
                         </select>
                     </div>
-
                     <button class="btn-primary" style="width: 100%;" onclick="calcAdvancedGrade()">Calculate</button>
-                    <div id="grade-result" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 10px; text-align: center; display: none;">
-                        </div>
+                    <div id="grade-result" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 10px; text-align: center; display: none;"></div>
                 </div>
-
                 <div class="notepad-layout" style="grid-template-columns: 1fr 1fr;">
                     <div class="glass-panel bubble" style="display: flex; flex-direction: column;">
                         <h3>Flashcards</h3>
-                        <div id="flashcard-display" class="flashcard" onclick="flipCard()">
-                            <div class="card-inner"><div class="card-front"><p id="card-front-text">Create a card!</p></div><div class="card-back"><p id="card-back-text">Answer here.</p></div></div>
-                        </div>
+                        <div id="flashcard-display" class="flashcard" onclick="flipCard()"><div class="card-inner"><div class="card-front"><p id="card-front-text">Create a card!</p></div><div class="card-back"><p id="card-back-text">Answer here.</p></div></div></div>
                         <div style="display: flex; gap: 10px; justify-content: center; margin: 10px 0;">
                             <button class="btn-primary" onclick="prevCard()"><</button><span id="card-counter" style="align-self: center;">0/0</span><button class="btn-primary" onclick="nextCard()">></button>
                         </div>
