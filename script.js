@@ -1,4 +1,4 @@
-/* VibeTable Logic - Final Polish */
+/* VibeTable Logic - Final Fixes */
 
 const CLIENT_ID = '951024875343-365jk5cjfkjbg8co3elc75jn41pe0ama.apps.googleusercontent.com'; 
 const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile';
@@ -33,119 +33,77 @@ window.onload = function() {
     initScrollPickers(); renderColorPickers(); setupDragDrop(); initHeatmap();
     setInterval(updateTimeLine, 60000); setInterval(updateDashboard, 60000);
     if(appData.timerTarget) checkTimerState();
-    addAssessmentRow(); // Add one row by default
+    addAssessmentRow();
 };
 
-/* --- GRADE CALCULATOR (ADVANCED) --- */
-function addAssessmentRow() {
-    const div = document.createElement('div');
-    div.className = 'grade-row';
-    div.innerHTML = `
-        <input type="text" class="bubble-input asm-name" placeholder="Name (e.g. Test 1)" style="margin:0; padding:8px;">
-        <input type="number" class="bubble-input asm-mark" placeholder="Mark %" style="margin:0; padding:8px;">
-        <input type="number" class="bubble-input asm-weight" placeholder="Wght %" style="margin:0; padding:8px;">
-        <i class="fas fa-trash" style="color: #d9534f; cursor: pointer; align-self: center;" onclick="this.parentElement.remove()"></i>
-    `;
-    document.getElementById('assessment-list').appendChild(div);
+/* --- NAVIGATION & SIDEBAR --- */
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('mobile-overlay');
+    
+    // Check if Mobile or Desktop
+    if (window.innerWidth <= 768) {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('open');
+    } else {
+        sidebar.classList.toggle('closed');
+    }
 }
 
+function switchTab(tabId) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; });
+    
+    // Show selected tab
+    const target = document.getElementById(tabId);
+    if(target) { target.style.display = 'block'; setTimeout(() => target.classList.add('active'), 10); }
+    
+    // HIGHLIGHT FIX: Remove 'active' from all nav buttons
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+    // Add 'active' to current button
+    const btn = document.getElementById('btn-' + tabId);
+    if(btn) btn.classList.add('active');
+
+    // Run Tab Specifics
+    if(tabId === 'timetable') { renderTimetable(); updateTimeLine(); }
+    if(tabId === 'dashboard') { updateDashboard(); renderHabits(); renderTodos(); }
+    if(tabId === 'notes') renderNotes();
+    if(tabId === 'countdowns') { renderEvents(); initHeatmap(); }
+    if(tabId === 'study') renderFlashcard();
+    if(tabId === 'profile') updateProfileUI();
+    
+    // Mobile Auto-Close
+    if (window.innerWidth <= 768) { document.getElementById('sidebar').classList.remove('open'); document.getElementById('mobile-overlay').classList.remove('open'); }
+}
+
+/* --- GRADE CALCULATOR --- */
+function addAssessmentRow() {
+    const div = document.createElement('div'); div.className = 'grade-row';
+    div.innerHTML = `<input type="text" class="bubble-input asm-name" placeholder="Name" style="margin:0; padding:8px;"><input type="number" class="bubble-input asm-mark" placeholder="Mark %" style="margin:0; padding:8px;"><input type="number" class="bubble-input asm-weight" placeholder="Wght %" style="margin:0; padding:8px;"><i class="fas fa-trash" style="color: #d9534f; cursor: pointer; align-self: center;" onclick="this.parentElement.remove()"></i>`;
+    document.getElementById('assessment-list').appendChild(div);
+}
 function calcAdvancedGrade() {
     const rows = document.querySelectorAll('.grade-row');
-    let totalAccumulated = 0;
-    let totalWeightUsed = 0;
-    
+    let totalAccumulated = 0; let totalWeightUsed = 0;
     rows.forEach(row => {
         const mark = parseFloat(row.querySelector('.asm-mark').value) || 0;
         const weight = parseFloat(row.querySelector('.asm-weight').value) || 0;
-        totalAccumulated += (mark * (weight / 100));
-        totalWeightUsed += weight;
+        totalAccumulated += (mark * (weight / 100)); totalWeightUsed += weight;
     });
-
     const target = parseInt(document.getElementById('grade-target').value);
     const remainingWeight = 100 - totalWeightUsed;
+    const resultDiv = document.getElementById('grade-result'); resultDiv.style.display = 'block';
     
-    const resultDiv = document.getElementById('grade-result');
-    resultDiv.style.display = 'block';
-
-    if (remainingWeight <= 0) {
-        resultDiv.innerHTML = `Total Mark: <b>${Math.round(totalAccumulated)}%</b><br>Weights used up.`;
-        return;
-    }
-
+    if (remainingWeight <= 0) { resultDiv.innerHTML = `Total Mark: <b>${Math.round(totalAccumulated)}%</b><br>Weights used up.`; return; }
+    
     const neededPoints = target - totalAccumulated;
     const requiredExamMark = (neededPoints / remainingWeight) * 100;
-
     let color = requiredExamMark > 100 ? '#d9534f' : '#155724';
     let msg = requiredExamMark > 100 ? "Impossible (Need > 100%)" : `<b>${Math.round(requiredExamMark)}%</b>`;
-
-    resultDiv.innerHTML = `
-        Current Year Mark: <b>${Math.round(totalAccumulated)}%</b> (of ${totalWeightUsed}%)<br>
-        Required on Final (${remainingWeight}%) for ${target}%:<br>
-        <span style="font-size: 1.5rem; color: ${color};">${msg}</span>
-    `;
+    resultDiv.innerHTML = `Current Year Mark: <b>${Math.round(totalAccumulated)}%</b> (of ${totalWeightUsed}%)<br>Required on Final (${remainingWeight}%) for ${target}%:<br><span style="font-size: 1.5rem; color: ${color};">${msg}</span>`;
 }
 
-/* --- SESSION LOGIC --- */
-function checkSession() {
-    const lastActive = localStorage.getItem('vibetable_last_active');
-    const now = Date.now();
-    if (lastActive && (now - lastActive > 1800000)) {
-        document.getElementById('login-screen').style.display = 'flex';
-        document.getElementById('app-screen').classList.add('hidden');
-    } else {
-        loadFromLocal();
-    }
-    updateActivity();
-}
-function updateActivity() { localStorage.setItem('vibetable_last_active', Date.now()); }
-
-/* --- SYNC ENGINE --- */
-function saveToLocal() { localStorage.setItem('vibetable_data', JSON.stringify(appData)); updateSyncUI(); }
-function loadFromLocal() {
-    const local = localStorage.getItem('vibetable_data');
-    if (local) { 
-        appData = JSON.parse(local); 
-        if(!appData.habits) appData.habits = [{name:"Read", streak:0, last:null}]; 
-        if(!appData.todos) appData.todos = []; 
-        if(document.getElementById('login-screen')) document.getElementById('login-screen').remove(); 
-        document.getElementById('app-screen').classList.remove('hidden'); document.getElementById('app-screen').classList.add('active');
-        refreshAllUI();
-    }
-}
-async function triggerSync() { saveToLocal(); if(accessToken) { await saveDataToDrive(); alert("Synced!"); } else { handleAuthClick(); } }
-function updateSyncUI(isSynced = false) {
-    const badge = document.getElementById('sync-status');
-    if(accessToken) { badge.className = 'status-badge online'; badge.innerHTML = '<i class="fas fa-check-circle"></i> <span>Synced</span>'; } 
-    else { badge.className = 'status-badge offline'; badge.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> <span>Offline Mode</span>'; }
-}
-
-/* --- AUTH --- */
-function initGoogleAuth() { try { tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: async (r) => { if(r.access_token) { accessToken = r.access_token; await handleLogin(); } } }); } catch(e) {} }
-function handleAuthClick() { tokenClient.requestAccessToken(); }
-async function handleLogin() { 
-    if(document.getElementById('login-screen')) document.getElementById('login-screen').remove(); 
-    document.getElementById('app-screen').classList.remove('hidden'); document.getElementById('app-screen').classList.add('active'); 
-    let res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {headers:{'Authorization':'Bearer '+accessToken}}); let user = await res.json(); 
-    if(user.picture) document.getElementById('sidebar-pic').src = user.picture; 
-    await loadData(); if(appData.userName) document.getElementById('dash-name').innerText = appData.userName; updateSyncUI(true);
-}
-const CURRENT_FILE = 'vibetable_v13.json'; 
-async function loadData() { try { let q = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='" + CURRENT_FILE + "'"; let r = await fetch(q, {headers:{'Authorization':'Bearer '+accessToken}}); if(r.status === 401) return; let d = await r.json(); if(d.files && d.files.length > 0) { driveFileId = d.files[0].id; let f = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {headers:{'Authorization':'Bearer '+accessToken}}); appData = await f.json(); saveToLocal(); refreshAllUI(); } } catch(e) { console.error(e); } }
-async function saveDataToDrive() { 
-    if(!accessToken) return;
-    const boundary = '-------314159265358979323846'; const delimiter = "\r\n--" + boundary + "\r\n"; const close_delim = "\r\n--" + boundary + "--";
-    const metadata = { name: CURRENT_FILE, mimeType: 'application/json', parents: ['appDataFolder'] };
-    const body = delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(metadata) + delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(appData) + close_delim;
-    let path = '/upload/drive/v3/files?uploadType=multipart'; let method = 'POST';
-    if(driveFileId) { path = `/upload/drive/v3/files/${driveFileId}?uploadType=multipart`; method = 'PATCH'; }
-    await fetch('https://www.googleapis.com' + path, { method: method, headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"', 'Authorization': 'Bearer ' + accessToken }, body: body });
-    updateSyncUI(true);
-}
-
-/* --- UI REFRESHER --- */
-function refreshAllUI() { renderTimetable(); updateTimeLine(); updateDashboard(); renderNotes(); renderHabits(); renderTodos(); initHeatmap(); }
-
-/* --- TIMETABLE (FIXED) --- */
+/* --- TIMETABLE --- */
 function toggleWeekends() { appData.showWeekends = !appData.showWeekends; triggerSync(); renderTimetable(); }
 function modifyTimetable(end, action) { if (action === 'add') { if(end === 'start' && appData.startHour > 0) appData.startHour--; if(end === 'end' && appData.endHour < 24) appData.endHour++; } else { if(end === 'start' && appData.startHour < appData.endHour) appData.startHour++; if(end === 'end' && appData.endHour > appData.startHour) appData.endHour--; } triggerSync(); renderTimetable(); }
 
@@ -157,11 +115,11 @@ function renderTimetable() {
     const cols = sourceData.showWeekends ? 7 : 5;
     
     // Headers
-    days.forEach(d => { let div = document.createElement('div'); div.className = 'grid-header'; div.innerText = d; grid.appendChild(div); });
+    days.forEach((d, index) => { let div = document.createElement('div'); div.className = 'grid-header'; if(index === 0) div.classList.add('sticky-col'); div.innerText = d; grid.appendChild(div); });
     
     // Rows
     for (let i = sourceData.startHour; i <= sourceData.endHour; i++) {
-        let time = document.createElement('div'); time.className = 'time-slot'; time.innerText = `${i}:00`; grid.appendChild(time);
+        let time = document.createElement('div'); time.className = 'time-slot sticky-col'; time.innerText = `${i}:00`; grid.appendChild(time);
         for (let j = 0; j < cols; j++) {
             let key = `${days[j+1]}-${i}`; let slot = document.createElement('div'); slot.className = 'class-slot bubble';
             if(sourceData.timetableColors && sourceData.timetableColors[key]) slot.style.background = sourceData.timetableColors[key];
@@ -182,24 +140,23 @@ function updateTimeLine() {
     if (pixelsDown < headerHeight) pixelsDown = headerHeight; if (pixelsDown > maxPixels) pixelsDown = maxPixels; line.style.top = `${pixelsDown}px`; line.style.display = 'block';
 }
 
-/* --- OTHER STANDARD FUNCTIONS --- */
-function updateDashboard() {
-    const now = new Date(); const hr = now.getHours();
-    let greet = hr < 12 ? "Good Morning" : hr < 18 ? "Good Afternoon" : "Good Evening";
-    document.getElementById('greet-msg').innerText = `${greet}, ${appData.userName || 'Student'}.`;
-    
-    let verseType = 'morning'; if(hr >= 10 && hr < 15) verseType = 'midday'; if(hr >= 15 && hr < 20) verseType = 'evening'; if(hr >= 20 || hr < 5) verseType = 'night';
-    const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
-    const verses = bibleVerses[verseType]; document.getElementById('daily-quote').innerText = verses[dayOfYear % verses.length];
+/* --- SESSION, SYNC, AUTH --- */
+function checkSession() { const lastActive = localStorage.getItem('vibetable_last_active'); const now = Date.now(); if (lastActive && (now - lastActive > 1800000)) { document.getElementById('login-screen').style.display = 'flex'; document.getElementById('app-screen').classList.add('hidden'); } else { loadFromLocal(); } updateActivity(); }
+function updateActivity() { localStorage.setItem('vibetable_last_active', Date.now()); }
+function saveToLocal() { localStorage.setItem('vibetable_data', JSON.stringify(appData)); updateSyncUI(); }
+function loadFromLocal() { const local = localStorage.getItem('vibetable_data'); if (local) { appData = JSON.parse(local); if(!appData.habits) appData.habits = [{name:"Read", streak:0, last:null}]; if(!appData.todos) appData.todos = []; if(document.getElementById('login-screen')) document.getElementById('login-screen').remove(); document.getElementById('app-screen').classList.remove('hidden'); document.getElementById('app-screen').classList.add('active'); refreshAllUI(); } }
+async function triggerSync() { saveToLocal(); if(accessToken) { await saveDataToDrive(); alert("Synced!"); } else { handleAuthClick(); } }
+function updateSyncUI(isSynced = false) { const badge = document.getElementById('sync-status'); if(accessToken) { badge.className = 'status-badge online'; badge.innerHTML = '<i class="fas fa-check-circle"></i> <span>Synced</span>'; } else { badge.className = 'status-badge offline'; badge.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> <span>Offline Mode</span>'; } }
+function initGoogleAuth() { try { tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: async (r) => { if(r.access_token) { accessToken = r.access_token; await handleLogin(); } } }); } catch(e) {} }
+function handleAuthClick() { tokenClient.requestAccessToken(); }
+async function handleLogin() { if(document.getElementById('login-screen')) document.getElementById('login-screen').remove(); document.getElementById('app-screen').classList.remove('hidden'); document.getElementById('app-screen').classList.add('active'); let res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {headers:{'Authorization':'Bearer '+accessToken}}); let user = await res.json(); if(user.picture) document.getElementById('sidebar-pic').src = user.picture; await loadData(); if(appData.userName) document.getElementById('dash-name').innerText = appData.userName; updateSyncUI(true); }
+const CURRENT_FILE = 'vibetable_v13.json'; 
+async function loadData() { try { let q = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='" + CURRENT_FILE + "'"; let r = await fetch(q, {headers:{'Authorization':'Bearer '+accessToken}}); if(r.status === 401) return; let d = await r.json(); if(d.files && d.files.length > 0) { driveFileId = d.files[0].id; let f = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {headers:{'Authorization':'Bearer '+accessToken}}); appData = await f.json(); saveToLocal(); refreshAllUI(); } } catch(e) { console.error(e); } }
+async function saveDataToDrive() { if(!accessToken) return; const boundary = '-------314159265358979323846'; const delimiter = "\r\n--" + boundary + "\r\n"; const close_delim = "\r\n--" + boundary + "--"; const metadata = { name: CURRENT_FILE, mimeType: 'application/json', parents: ['appDataFolder'] }; const body = delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(metadata) + delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(appData) + close_delim; let path = '/upload/drive/v3/files?uploadType=multipart'; let method = 'POST'; if(driveFileId) { path = `/upload/drive/v3/files/${driveFileId}?uploadType=multipart`; method = 'PATCH'; } await fetch('https://www.googleapis.com' + path, { method: method, headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"', 'Authorization': 'Bearer ' + accessToken }, body: body }); updateSyncUI(true); }
+function refreshAllUI() { renderTimetable(); updateTimeLine(); updateDashboard(); renderNotes(); renderHabits(); renderTodos(); initHeatmap(); }
 
-    const nextEvent = appData.events.find(e => new Date(e.date) > now);
-    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; const todayName = dayNames[now.getDay()];
-    let currentClass = appData.timetable[`${todayName}-${hr}`];
-    
-    if(currentClass) { document.getElementById('up-next-display').innerText = `Now: ${currentClass}`; document.getElementById('up-next-sub').innerText = `Check timetable.`; }
-    else if (nextEvent) { const diff = Math.ceil((new Date(nextEvent.date) - now) / (1000*60*60*24)); document.getElementById('up-next-display').innerText = `Upcoming: ${nextEvent.name}`; document.getElementById('up-next-sub').innerText = `In ${diff} days.`; }
-    else { document.getElementById('up-next-display').innerText = "All caught up!"; document.getElementById('up-next-sub').innerText = "Time to relax."; }
-}
+/* --- OTHER --- */
+function updateDashboard() { const now = new Date(); const hr = now.getHours(); let greet = hr < 12 ? "Good Morning" : hr < 18 ? "Good Afternoon" : "Good Evening"; document.getElementById('greet-msg').innerText = `${greet}, ${appData.userName || 'Student'}.`; let verseType = 'morning'; if(hr >= 10 && hr < 15) verseType = 'midday'; if(hr >= 15 && hr < 20) verseType = 'evening'; if(hr >= 20 || hr < 5) verseType = 'night'; const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24); const verses = bibleVerses[verseType]; document.getElementById('daily-quote').innerText = verses[dayOfYear % verses.length]; const nextEvent = appData.events.find(e => new Date(e.date) > now); const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; const todayName = dayNames[now.getDay()]; let currentClass = appData.timetable[`${todayName}-${hr}`]; if(currentClass) { document.getElementById('up-next-display').innerText = `Now: ${currentClass}`; document.getElementById('up-next-sub').innerText = `Check timetable.`; } else if (nextEvent) { const diff = Math.ceil((new Date(nextEvent.date) - now) / (1000*60*60*24)); document.getElementById('up-next-display').innerText = `Upcoming: ${nextEvent.name}`; document.getElementById('up-next-sub').innerText = `In ${diff} days.`; } else { document.getElementById('up-next-display').innerText = "All caught up!"; document.getElementById('up-next-sub').innerText = "Time to relax."; } }
 function renderHabits() { const c = document.getElementById('habit-container'); if(!c) return; c.innerHTML = ''; appData.habits.forEach((h, i) => { let div = document.createElement('div'); div.className = 'habit-item'; let today = new Date().toISOString().slice(0,10); if(h.last === today) div.classList.add('done'); div.innerHTML = `<div class="habit-circle"><i class="fas fa-check"></i></div><small>${h.name}</small>`; div.onclick = () => { if(h.last === today) { h.last = null; h.streak--; } else { h.last = today; h.streak++; } triggerSync(); renderHabits(); }; c.appendChild(div); }); }
 function renderTodos() { const l = document.getElementById('todo-list'); if(!l) return; l.innerHTML = ''; appData.todos.forEach((t, i) => { let d = document.createElement('div'); d.className = 'todo-item' + (t.done ? ' done' : ''); d.innerHTML = `<input type="checkbox" ${t.done ? 'checked' : ''}><span>${t.text}</span><i class="fas fa-trash" style="margin-left:auto; cursor:pointer; color:#d9534f;"></i>`; d.querySelector('input').onclick = () => { t.done = !t.done; triggerSync(); renderTodos(); }; d.querySelector('i').onclick = () => { appData.todos.splice(i, 1); triggerSync(); renderTodos(); }; l.appendChild(d); }); }
 function addTodo() { let v = document.getElementById('todo-input').value; if(v) { appData.todos.push({text:v, done:false}); document.getElementById('todo-input').value=''; triggerSync(); renderTodos(); } }
@@ -207,8 +164,6 @@ function downloadPDF() { const element = document.getElementById('capture-area')
 function exportSchedule() { const shareData = { userName: appData.userName, timetable: appData.timetable, timetableColors: appData.timetableColors, startHour: appData.startHour, endHour: appData.endHour, showWeekends: appData.showWeekends }; const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(shareData)); const node = document.createElement('a'); node.setAttribute("href", dataStr); node.setAttribute("download", `${appData.userName || 'My'}_Schedule.vibe.json`); document.body.appendChild(node); node.click(); node.remove(); }
 function importFriendSchedule(input) { const file = input.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = function(e) { friendData = JSON.parse(e.target.result); isViewingFriend = true; document.getElementById('friend-mode-banner').style.display = 'flex'; document.getElementById('friend-mode-banner').querySelector('strong').innerText = `Viewing: ${friendData.userName}'s Schedule`; renderTimetable(); }; reader.readAsText(file); }
 function exitFriendMode() { isViewingFriend = false; friendData = null; document.getElementById('friend-mode-banner').style.display = 'none'; renderTimetable(); }
-function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('mobile-overlay').classList.toggle('open'); }
-function switchTab(tabId) { document.querySelectorAll('.tab-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; }); const target = document.getElementById(tabId); if(target) { target.style.display = 'block'; setTimeout(() => target.classList.add('active'), 10); } if(tabId === 'timetable') { renderTimetable(); updateTimeLine(); } if(tabId === 'dashboard') { updateDashboard(); renderHabits(); renderTodos(); } if(tabId === 'notes') renderNotes(); if(tabId === 'countdowns') { renderEvents(); initHeatmap(); } if(tabId === 'study') renderFlashcard(); if(tabId === 'profile') updateProfileUI(); if (window.innerWidth <= 768) { document.getElementById('sidebar').classList.remove('open'); document.getElementById('mobile-overlay').classList.remove('open'); } }
 function startTimer() { if(timerInterval) return; appData.timerTarget = Date.now() + (25 * 60 * 1000); saveToLocal(); checkTimerState(); }
 function checkTimerState() { if (!appData.timerTarget) return; document.getElementById('btn-start').classList.add('alarm-active'); if (timerInterval) clearInterval(timerInterval); timerInterval = setInterval(() => { const now = Date.now(); const left = Math.round((appData.timerTarget - now) / 1000); if (left <= 0) { triggerAlarm(); } else { let m = Math.floor(left / 60); let s = left % 60; document.getElementById('timer-display').innerText = `${m}:${s < 10 ? '0' : ''}${s}`; } }, 1000); }
 function pauseTimer() { clearInterval(timerInterval); timerInterval = null; appData.timerTarget = null; saveToLocal(); document.getElementById('btn-start').classList.remove('alarm-active'); }
@@ -239,4 +194,5 @@ function toggleTheme() { if(document.body.hasAttribute('data-theme')) { document
 function insertTemplate(type) { let t = ""; if(type === 'legal') t = "<b>Case Name:</b><br><b>Citation:</b><br><b>Facts:</b><br><br><b>Legal Issue:</b><br><br><b>Judgment:</b><br><br><b>Ratio Decidendi:</b><br>"; if(type === 'meeting') t = "<b>Meeting:</b><br><b>Date:</b><br><b>Attendees:</b><br><br><b>Key Points:</b><br>1.<br>2.<br><br><b>Action Items:</b><br>"; document.getElementById('note-body').innerHTML += t; }
 function renderColorPickers() { const c = document.getElementById('timetable-colors'); const h = document.getElementById('highlighter-toolbar'); if(!c) return; c.innerHTML = ''; h.innerHTML = ''; palette.forEach(col => { let dot = document.createElement('div'); dot.className = 'color-dot'; dot.style.background = col; dot.onclick = () => { selectedColor = col; }; c.appendChild(dot); let hl = document.createElement('div'); hl.className = 'hl-btn'; hl.style.background = col; hl.onmousedown = (e) => { e.preventDefault(); document.execCommand('hiliteColor', false, col); }; h.appendChild(hl); }); }
 function setupDragDrop() { const zone = document.getElementById('drop-zone'); if(!zone) return; zone.ondragover = (e) => { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; }; zone.ondragleave = (e) => { e.preventDefault(); zone.style.borderColor = 'var(--primary)'; }; zone.ondrop = (e) => { e.preventDefault(); zone.style.borderColor = 'var(--primary)'; const file = e.dataTransfer.files[0]; if(file && file.type.startsWith('image/')) { const reader = new FileReader(); reader.onload = (event) => { appData.userPic = event.target.result; triggerSync(); alert("Profile picture updated!"); }; reader.readAsDataURL(file); } }; }
+function downloadBackup() { const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData)); const downloadAnchorNode = document.createElement('a'); downloadAnchorNode.setAttribute("href", dataStr); downloadAnchorNode.setAttribute("download", "vibetable_backup_" + new Date().toISOString().slice(0,10) + ".json"); document.body.appendChild(downloadAnchorNode); downloadAnchorNode.click(); downloadAnchorNode.remove(); }
 const palette = ['#E3D8C1', '#CEC1A8', '#B59E7D', '#AAA396', '#E6CBB8', '#B4833D', '#81754B', '#584738', '#B8E6C1'];
