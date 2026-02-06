@@ -4,16 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>VibeTable | Student OS</title>
+    
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌱</text></svg>">
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
-    
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -35,13 +39,17 @@
                 </div>
                 <button onclick="toggleSidebar()" class="close-btn"><i class="fas fa-times"></i></button>
             </div>
-            <div id="sync-status" class="status-badge offline" onclick="handleAuthClick()"><i class="fas fa-cloud-upload-alt"></i> <span>Offline Mode</span></div>
+            
+            <div id="sync-status" class="status-badge offline" onclick="handleAuthClick()"><i class="fas fa-cloud-upload-alt"></i> <span>Offline</span></div>
+            
             <button class="nav-btn active" onclick="switchTab('dashboard')"><i class="fas fa-home"></i> Dashboard</button>
             <button class="nav-btn" onclick="switchTab('timetable')"><i class="fas fa-calendar-alt"></i> Timetable</button>
             <button class="nav-btn" onclick="switchTab('countdowns')"><i class="fas fa-hourglass-half"></i> Countdowns</button>
             <button class="nav-btn" onclick="switchTab('study')"><i class="fas fa-graduation-cap"></i> Study Tools</button>
             <button class="nav-btn" onclick="switchTab('notes')"><i class="fas fa-book-open"></i> Notes</button>
+            
             <div style="flex-grow: 1;"></div> 
+            
             <button class="nav-btn" onclick="switchTab('profile')">
                 <img id="sidebar-pic" src="" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary);"> Profile
             </button>
@@ -51,15 +59,11 @@
 
         <main class="content">
             <section id="dashboard" class="tab-content active">
-                <div class="welcome-header">
-                    <h2 id="greet-msg">Hello.</h2>
-                </div>
-                
+                <div class="welcome-header"><h2 id="greet-msg">Hello.</h2></div>
                 <div class="glass-panel bubble" style="padding: 15px; margin-bottom: 20px;">
                     <h4 style="margin-bottom: 10px; color: var(--text-muted);">Habit Loop</h4>
                     <div id="habit-container" style="display: flex; gap: 15px; overflow-x: auto; padding-bottom: 5px;"></div>
                 </div>
-
                 <div class="dashboard-grid">
                     <div class="glass-panel bubble">
                         <h3><i class="fas fa-brain"></i> Brain Dump</h3>
@@ -69,14 +73,12 @@
                         </div>
                         <div id="todo-list" style="margin-top: 15px; max-height: 200px; overflow-y: auto;"></div>
                     </div>
-
                     <div class="glass-panel bubble" style="border-left: 5px solid var(--accent);">
                         <h3><i class="fas fa-forward"></i> Up Next</h3>
                         <div id="up-next-display" style="font-size: 1.2rem; font-weight: bold; margin-top: 10px;">Checking...</div>
                         <p id="up-next-sub" style="font-size: 0.9rem; color: var(--text-muted);">Relax.</p>
                     </div>
                 </div>
-                
                 <div class="glass-panel bubble" style="margin-top: 20px;">
                     <h3><i class="fas fa-bible"></i> Daily Word</h3>
                     <p id="daily-quote" style="font-style: italic; font-size: 1.1rem; margin-top: 10px;">"Loading..."</p>
@@ -84,17 +86,31 @@
             </section>
 
             <section id="timetable" class="tab-content">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+                
+                <div id="friend-mode-banner" style="display: none; background: #3498db; color: white; padding: 15px; border-radius: 15px; margin-bottom: 20px; text-align: center; justify-content: space-between; align-items: center;">
+                    <strong><i class="fas fa-eye"></i> Viewing Shared Timetable</strong>
+                    <button onclick="exitFriendMode()" style="background: white; color: #3498db; border: none; padding: 5px 15px; border-radius: 20px; font-weight: bold; cursor: pointer;">Exit</button>
+                </div>
+
+                <div class="timetable-controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
                     <h2>Weekly Flow</h2>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <button class="btn-primary" style="background: var(--text-muted); font-size: 0.8rem;" onclick="toggleWeekends()">Weekends</button>
+                    <div style="display: flex; gap: 5px; align-items: center;">
+                        <button class="btn-primary" style="background: var(--text-muted); font-size: 0.8rem; padding: 10px;" onclick="toggleWeekends()">Wknd</button>
+                        
+                        <button class="btn-primary" style="background: #3498db; font-size: 0.8rem; padding: 10px;" onclick="document.getElementById('import-file').click()"><i class="fas fa-user-friends"></i> View Friend</button>
+                        <button class="btn-primary" style="background: #e67e22; font-size: 0.8rem; padding: 10px;" onclick="exportSchedule()"><i class="fas fa-share-alt"></i> Share</button>
+                        <button class="btn-primary" style="background: #e74c3c; font-size: 0.8rem; padding: 10px;" onclick="downloadPDF()"><i class="fas fa-file-pdf"></i> PDF</button>
+                        
                         <div id="timetable-colors" style="display: flex; gap: 5px;"></div>
                         <button class="btn-primary" onclick="triggerSync()">Save</button>
                     </div>
                 </div>
+                
+                <input type="file" id="import-file" style="display: none;" onchange="importFriendSchedule(this)">
+
                 <div class="timetable-wrapper" id="timetable-container">
                     <button class="add-row-btn" onclick="modifyTimetable('start', 'add')"><i class="fas fa-arrow-up"></i> Earlier</button>
-                    <div style="position: relative;">
+                    <div style="position: relative;" id="capture-area">
                         <div id="current-time-line"></div>
                         <div class="timetable-grid" id="timetable-grid"></div>
                     </div>
@@ -104,7 +120,6 @@
 
             <section id="study" class="tab-content">
                 <h2>Study Tools</h2>
-                
                 <div class="glass-panel bubble" style="margin-bottom: 20px;">
                     <h3><i class="fas fa-chart-line"></i> Grade Pulse</h3>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
@@ -114,63 +129,38 @@
                     <button class="btn-primary" style="width: 100%;" onclick="calcGrade()">Calculate Needed for 75%</button>
                     <p id="grade-result" style="margin-top: 10px; font-weight: bold; text-align: center; color: var(--accent);"></p>
                 </div>
-
                 <div class="notepad-layout" style="grid-template-columns: 1fr 1fr;">
                     <div class="glass-panel bubble" style="display: flex; flex-direction: column;">
                         <h3>Flashcards</h3>
                         <div id="flashcard-display" class="flashcard" onclick="flipCard()">
-                            <div class="card-inner">
-                                <div class="card-front"><p id="card-front-text">Create a card!</p></div>
-                                <div class="card-back"><p id="card-back-text">Answer here.</p></div>
-                            </div>
+                            <div class="card-inner"><div class="card-front"><p id="card-front-text">Create a card!</p></div><div class="card-back"><p id="card-back-text">Answer here.</p></div></div>
                         </div>
                         <div style="display: flex; gap: 10px; justify-content: center; margin: 10px 0;">
-                            <button class="btn-primary" onclick="prevCard()"><</button>
-                            <span id="card-counter" style="align-self: center; font-weight: bold;">0/0</span>
-                            <button class="btn-primary" onclick="nextCard()">></button>
+                            <button class="btn-primary" onclick="prevCard()"><</button><span id="card-counter" style="align-self: center;">0/0</span><button class="btn-primary" onclick="nextCard()">></button>
                         </div>
                         <div style="margin-top: auto; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 10px;">
-                            <input type="text" id="fc-q" class="bubble-input" placeholder="Q" style="padding: 8px;">
-                            <input type="text" id="fc-a" class="bubble-input" placeholder="A" style="padding: 8px;">
-                            <button class="btn-primary" style="width: 100%;" onclick="addFlashcard()">Add</button>
+                            <input type="text" id="fc-q" class="bubble-input" placeholder="Q" style="padding: 8px;"><input type="text" id="fc-a" class="bubble-input" placeholder="A" style="padding: 8px;"><button class="btn-primary" style="width: 100%;" onclick="addFlashcard()">Add</button>
                         </div>
                     </div>
-
                     <div class="glass-panel bubble" style="text-align: center;">
                         <h3>Focus Timer</h3>
                         <div id="timer-display" style="font-size: 3rem; font-weight: 800; color: var(--text); margin: 15px 0;">25:00</div>
                         <div style="display: flex; gap: 5px; justify-content: center; margin-bottom: 20px;">
-                            <button class="btn-primary" onclick="startTimer()" id="btn-start">Start</button>
-                            <button class="btn-primary" style="background: var(--text-muted);" onclick="pauseTimer()">Pause</button>
-                            <button class="btn-primary" style="background: #d9534f;" onclick="resetTimer()">Reset</button>
+                            <button class="btn-primary" onclick="startTimer()" id="btn-start">Start</button><button class="btn-primary" style="background: var(--text-muted);" onclick="pauseTimer()">Pause</button><button class="btn-primary" style="background: #d9534f;" onclick="resetTimer()">Reset</button>
                         </div>
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
-                            <button class="nav-btn" onclick="requestNotification()" style="justify-content: center; background: rgba(0,0,0,0.05); font-size: 0.8rem;">
-                                <i class="fas fa-bell"></i> Enable Sound
-                            </button>
-                            <a href="clock-alarm:" class="nav-btn" style="justify-content: center; background: rgba(0,0,0,0.05); text-decoration: none; color: var(--text-muted); font-size: 0.8rem;">
-                                <i class="fas fa-external-link-alt"></i> Open Clock App
-                            </a>
-                        </div>
+                        <button class="nav-btn" onclick="requestNotification()" style="justify-content: center; background: rgba(0,0,0,0.05); font-size: 0.8rem;"><i class="fas fa-bell"></i> Enable Sound</button>
+                        <a href="clock-alarm:" class="nav-btn" style="justify-content: center; background: rgba(0,0,0,0.05); text-decoration: none; color: var(--text-muted); font-size: 0.8rem;"><i class="fas fa-external-link-alt"></i> Open Clock App</a>
                     </div>
                 </div>
             </section>
 
             <section id="countdowns" class="tab-content">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h2>Time Tracker</h2>
-                    <button class="btn-primary" onclick="triggerSync()">Save All</button>
-                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;"><h2>Time Tracker</h2><button class="btn-primary" onclick="triggerSync()">Save All</button></div>
                 <div class="glass-panel bubble"><h3 style="margin-bottom: 10px;">Deadline Heatmap</h3><div id="heatmap-grid" class="heatmap-grid"></div></div>
                 <div class="glass-panel bubble">
                     <input type="text" id="event-name" class="bubble-input" placeholder="Event Name...">
                     <div class="ios-picker-container">
-                        <div class="picker-column" id="picker-day"></div>
-                        <div class="picker-column" id="picker-month"></div>
-                        <div class="picker-column" id="picker-year"></div>
-                        <div class="picker-column" id="picker-hour"></div>
-                        <div class="picker-column" id="picker-minute"></div>
-                        <div class="picker-highlight"></div>
+                        <div class="picker-column" id="picker-day"></div><div class="picker-column" id="picker-month"></div><div class="picker-column" id="picker-year"></div><div class="picker-column" id="picker-hour"></div><div class="picker-column" id="picker-minute"></div><div class="picker-highlight"></div>
                     </div>
                     <button class="btn-primary" style="width: 100%; margin-top: 20px;" onclick="addEvent()">Create Countdown</button>
                 </div>
@@ -207,27 +197,17 @@
             <section id="profile" class="tab-content">
                 <h2>My Profile</h2>
                 <div class="glass-panel bubble" style="max-width: 500px; margin: 0 auto; text-align: center;">
-                    <div id="drop-zone" class="profile-drop-zone">
-                        <img id="profile-pic-large" src="" alt="Profile">
-                        <div class="drop-overlay">Drop Image Here</div>
-                    </div>
-                    <div class="input-group" style="text-align: left;">
-                        <label>Display Name</label>
-                        <input type="text" id="edit-name" class="bubble-input">
-                    </div>
+                    <div id="drop-zone" class="profile-drop-zone"><img id="profile-pic-large" src="" alt="Profile"><div class="drop-overlay">Drop Image Here</div></div>
+                    <div class="input-group" style="text-align: left;"><label>Display Name</label><input type="text" id="edit-name" class="bubble-input"></div>
                     <button class="btn-primary" style="width: 100%; margin-top: 10px;" onclick="saveProfile()">Save Profile</button>
                     <button class="btn-primary" style="width: 100%; margin-top: 15px; background: #666;" onclick="downloadBackup()">💾 Download Backup</button>
-                    <div style="margin-top: 30px;">
-                        <button onclick="toggleTheme()" class="btn-primary" style="background: #333; width: 100%;">Toggle Dark Mode</button>
-                    </div>
+                    <div style="margin-top: 30px;"><button onclick="toggleTheme()" class="btn-primary" style="background: #333; width: 100%;">Toggle Dark Mode</button></div>
                 </div>
             </section>
         </main>
     </div>
 
-    <script>
-        if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
-    </script>
+    <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }</script>
     <script src="script.js"></script>
 </body>
 </html>
