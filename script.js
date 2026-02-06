@@ -1,8 +1,7 @@
-/* VibeTable Logic - Production Stable */
+/* VibeTable Logic - Final Polish */
 
 const CLIENT_ID = '951024875343-365jk5cjfkjbg8co3elc75jn41pe0ama.apps.googleusercontent.com'; 
 const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile';
-const CURRENT_FILE = 'vibetable_v13.json'; 
 
 let appData = { 
     userName: "Student", userPic: null, theme: 'light',
@@ -12,9 +11,8 @@ let appData = {
     habits: [{name: "Read", streak: 0, last: null}, {name: "Gym", streak: 0, last: null}, {name: "Water", streak: 0, last: null}],
     todos: [], timerTarget: null 
 };
-
 let accessToken = null;
-let driveFileId = null; // Stores the ID so we update instead of duplicate
+let driveFileId = null;
 let audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg'); 
 let timerInterval;
 let friendData = null; 
@@ -31,26 +29,69 @@ window.onload = function() {
     checkSession();
     document.addEventListener('click', updateActivity);
     document.addEventListener('keypress', updateActivity);
-    
-    // Attempt silent auth on load
     initGoogleAuth(); 
-    
     initScrollPickers(); renderColorPickers(); setupDragDrop(); initHeatmap();
     setInterval(updateTimeLine, 60000); setInterval(updateDashboard, 60000);
     if(appData.timerTarget) checkTimerState();
+    addAssessmentRow(); // Add one row by default
 };
+
+/* --- GRADE CALCULATOR (ADVANCED) --- */
+function addAssessmentRow() {
+    const div = document.createElement('div');
+    div.className = 'grade-row';
+    div.innerHTML = `
+        <input type="text" class="bubble-input asm-name" placeholder="Name (e.g. Test 1)" style="margin:0; padding:8px;">
+        <input type="number" class="bubble-input asm-mark" placeholder="Mark %" style="margin:0; padding:8px;">
+        <input type="number" class="bubble-input asm-weight" placeholder="Wght %" style="margin:0; padding:8px;">
+        <i class="fas fa-trash" style="color: #d9534f; cursor: pointer; align-self: center;" onclick="this.parentElement.remove()"></i>
+    `;
+    document.getElementById('assessment-list').appendChild(div);
+}
+
+function calcAdvancedGrade() {
+    const rows = document.querySelectorAll('.grade-row');
+    let totalAccumulated = 0;
+    let totalWeightUsed = 0;
+    
+    rows.forEach(row => {
+        const mark = parseFloat(row.querySelector('.asm-mark').value) || 0;
+        const weight = parseFloat(row.querySelector('.asm-weight').value) || 0;
+        totalAccumulated += (mark * (weight / 100));
+        totalWeightUsed += weight;
+    });
+
+    const target = parseInt(document.getElementById('grade-target').value);
+    const remainingWeight = 100 - totalWeightUsed;
+    
+    const resultDiv = document.getElementById('grade-result');
+    resultDiv.style.display = 'block';
+
+    if (remainingWeight <= 0) {
+        resultDiv.innerHTML = `Total Mark: <b>${Math.round(totalAccumulated)}%</b><br>Weights used up.`;
+        return;
+    }
+
+    const neededPoints = target - totalAccumulated;
+    const requiredExamMark = (neededPoints / remainingWeight) * 100;
+
+    let color = requiredExamMark > 100 ? '#d9534f' : '#155724';
+    let msg = requiredExamMark > 100 ? "Impossible (Need > 100%)" : `<b>${Math.round(requiredExamMark)}%</b>`;
+
+    resultDiv.innerHTML = `
+        Current Year Mark: <b>${Math.round(totalAccumulated)}%</b> (of ${totalWeightUsed}%)<br>
+        Required on Final (${remainingWeight}%) for ${target}%:<br>
+        <span style="font-size: 1.5rem; color: ${color};">${msg}</span>
+    `;
+}
 
 /* --- SESSION LOGIC --- */
 function checkSession() {
     const lastActive = localStorage.getItem('vibetable_last_active');
     const now = Date.now();
-    
-    // If inactive for > 30 mins, force login, but keep data safe
     if (lastActive && (now - lastActive > 1800000)) {
         document.getElementById('login-screen').style.display = 'flex';
         document.getElementById('app-screen').classList.add('hidden');
-        // We DO NOT wipe local storage here to prevent data loss. 
-        // We just hide the UI.
     } else {
         loadFromLocal();
     }
@@ -58,170 +99,144 @@ function checkSession() {
 }
 function updateActivity() { localStorage.setItem('vibetable_last_active', Date.now()); }
 
-/* --- SYNC ENGINE (FIXED) --- */
+/* --- SYNC ENGINE --- */
 function saveToLocal() { localStorage.setItem('vibetable_data', JSON.stringify(appData)); updateSyncUI(); }
-
 function loadFromLocal() {
     const local = localStorage.getItem('vibetable_data');
     if (local) { 
         appData = JSON.parse(local); 
-        // Restore UI state
+        if(!appData.habits) appData.habits = [{name:"Read", streak:0, last:null}]; 
+        if(!appData.todos) appData.todos = []; 
         if(document.getElementById('login-screen')) document.getElementById('login-screen').remove(); 
-        document.getElementById('app-screen').classList.remove('hidden'); 
-        document.getElementById('app-screen').classList.add('active');
-        
+        document.getElementById('app-screen').classList.remove('hidden'); document.getElementById('app-screen').classList.add('active');
         refreshAllUI();
     }
 }
-
-async function triggerSync() { 
-    saveToLocal(); // Always save to phone first
-    if(!accessToken) { handleAuthClick(); return; }
-
-    const boundary = '-------314159265358979323846';
-    const delimiter = "\r\n--" + boundary + "\r\n";
-    const close_delim = "\r\n--" + boundary + "--";
-
-    const contentType = 'application/json';
-    const metadata = { name: CURRENT_FILE, mimeType: contentType, parents: ['appDataFolder'] };
-
-    const multipartRequestBody =
-        delimiter +
-        'Content-Type: application/json\r\n\r\n' +
-        JSON.stringify(metadata) +
-        delimiter +
-        'Content-Type: ' + contentType + '\r\n\r\n' +
-        JSON.stringify(appData) +
-        close_delim;
-
-    try {
-        let requestPath = '/upload/drive/v3/files?uploadType=multipart';
-        let method = 'POST';
-
-        // IF WE HAVE A FILE ID, WE UPDATE (PATCH) INSTEAD OF CREATE
-        if (driveFileId) {
-            requestPath = `/upload/drive/v3/files/${driveFileId}?uploadType=multipart`;
-            method = 'PATCH';
-        }
-
-        let response = await fetch('https://www.googleapis.com' + requestPath, {
-            method: method,
-            headers: {
-                'Content-Type': 'multipart/related; boundary="' + boundary + '"',
-                'Authorization': 'Bearer ' + accessToken
-            },
-            body: multipartRequestBody
-        });
-
-        if (response.status === 401) {
-            // Token expired! Re-auth
-            console.log("Token expired. Refreshing...");
-            handleAuthClick(); 
-            return; 
-        }
-
-        if (response.ok) {
-            let result = await response.json();
-            driveFileId = result.id; // Save ID for next time
-            updateSyncUI(true);
-            alert("Synced successfully!");
-        }
-    } catch (e) {
-        console.error("Sync failed", e);
-        alert("Sync failed. Check internet.");
-    }
-}
-
-async function loadData() {
-    try {
-        let q = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='" + CURRENT_FILE + "'";
-        let r = await fetch(q, {headers:{'Authorization':'Bearer '+accessToken}});
-        
-        if (r.status === 401) return; // Silent fail if token dead on load
-
-        let d = await r.json();
-        if(d.files && d.files.length > 0) {
-            driveFileId = d.files[0].id; // CAPTURE THE ID
-            let f = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {headers:{'Authorization':'Bearer '+accessToken}});
-            let cloudData = await f.json();
-            // Merge cloud data? For now, we overwrite local to ensure sync
-            appData = cloudData;
-            saveToLocal();
-            refreshAllUI();
-        }
-    } catch(e) { console.error(e); }
-}
-
+async function triggerSync() { saveToLocal(); if(accessToken) { await saveDataToDrive(); alert("Synced!"); } else { handleAuthClick(); } }
 function updateSyncUI(isSynced = false) {
     const badge = document.getElementById('sync-status');
-    if(accessToken && isSynced) {
-        badge.className = 'status-badge online';
-        badge.innerHTML = '<i class="fas fa-check-circle"></i> <span>Synced</span>';
-    } else if (accessToken) {
-        badge.className = 'status-badge online'; // Logged in but pending save
-        badge.innerHTML = '<i class="fas fa-wifi"></i> <span>Connected</span>';
-    } else {
-        badge.className = 'status-badge offline';
-        badge.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> <span>Offline Mode</span>';
-    }
+    if(accessToken) { badge.className = 'status-badge online'; badge.innerHTML = '<i class="fas fa-check-circle"></i> <span>Synced</span>'; } 
+    else { badge.className = 'status-badge offline'; badge.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> <span>Offline Mode</span>'; }
 }
 
 /* --- AUTH --- */
-function initGoogleAuth() {
-    try {
-        tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID, scope: SCOPES,
-            callback: async (r) => { 
-                if(r.access_token) { 
-                    accessToken = r.access_token; 
-                    await handleLogin(); 
-                } 
-            }
-        });
-        // Try silent load if we have a hint? Not possible with implicit flow easily, 
-        // so we wait for user action or cached token if we moved to code flow.
-    } catch(e) {}
-}
+function initGoogleAuth() { try { tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: async (r) => { if(r.access_token) { accessToken = r.access_token; await handleLogin(); } } }); } catch(e) {} }
 function handleAuthClick() { tokenClient.requestAccessToken(); }
 async function handleLogin() { 
     if(document.getElementById('login-screen')) document.getElementById('login-screen').remove(); 
-    document.getElementById('app-screen').classList.remove('hidden'); 
-    document.getElementById('app-screen').classList.add('active'); 
-    
-    // Fetch User Info
-    let res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {headers:{'Authorization':'Bearer '+accessToken}});
-    let user = await res.json();
-    if(user.picture) {
-        document.getElementById('sidebar-pic').src = user.picture;
-        document.getElementById('profile-pic-large').src = user.picture;
-    }
-    
-    await loadData(); // Check cloud
-    if(appData.userName) document.getElementById('dash-name').innerText = appData.userName;
+    document.getElementById('app-screen').classList.remove('hidden'); document.getElementById('app-screen').classList.add('active'); 
+    let res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {headers:{'Authorization':'Bearer '+accessToken}}); let user = await res.json(); 
+    if(user.picture) document.getElementById('sidebar-pic').src = user.picture; 
+    await loadData(); if(appData.userName) document.getElementById('dash-name').innerText = appData.userName; updateSyncUI(true);
+}
+const CURRENT_FILE = 'vibetable_v13.json'; 
+async function loadData() { try { let q = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='" + CURRENT_FILE + "'"; let r = await fetch(q, {headers:{'Authorization':'Bearer '+accessToken}}); if(r.status === 401) return; let d = await r.json(); if(d.files && d.files.length > 0) { driveFileId = d.files[0].id; let f = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {headers:{'Authorization':'Bearer '+accessToken}}); appData = await f.json(); saveToLocal(); refreshAllUI(); } } catch(e) { console.error(e); } }
+async function saveDataToDrive() { 
+    if(!accessToken) return;
+    const boundary = '-------314159265358979323846'; const delimiter = "\r\n--" + boundary + "\r\n"; const close_delim = "\r\n--" + boundary + "--";
+    const metadata = { name: CURRENT_FILE, mimeType: 'application/json', parents: ['appDataFolder'] };
+    const body = delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(metadata) + delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(appData) + close_delim;
+    let path = '/upload/drive/v3/files?uploadType=multipart'; let method = 'POST';
+    if(driveFileId) { path = `/upload/drive/v3/files/${driveFileId}?uploadType=multipart`; method = 'PATCH'; }
+    await fetch('https://www.googleapis.com' + path, { method: method, headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"', 'Authorization': 'Bearer ' + accessToken }, body: body });
     updateSyncUI(true);
 }
 
 /* --- UI REFRESHER --- */
-function refreshAllUI() {
-    renderGroups(); renderTimetable(); renderEvents(); renderNotes(); updateProfileUI(); updateDashboard(); initHeatmap(); renderHabits(); renderTodos();
+function refreshAllUI() { renderTimetable(); updateTimeLine(); updateDashboard(); renderNotes(); renderHabits(); renderTodos(); initHeatmap(); }
+
+/* --- TIMETABLE (FIXED) --- */
+function toggleWeekends() { appData.showWeekends = !appData.showWeekends; triggerSync(); renderTimetable(); }
+function modifyTimetable(end, action) { if (action === 'add') { if(end === 'start' && appData.startHour > 0) appData.startHour--; if(end === 'end' && appData.endHour < 24) appData.endHour++; } else { if(end === 'start' && appData.startHour < appData.endHour) appData.startHour++; if(end === 'end' && appData.endHour > appData.startHour) appData.endHour--; } triggerSync(); renderTimetable(); }
+
+function renderTimetable() {
+    const grid = document.getElementById('timetable-grid'); if(!grid) return; grid.innerHTML = ''; 
+    const sourceData = isViewingFriend ? friendData : appData;
+    if(sourceData.showWeekends) grid.classList.add('show-weekends'); else grid.classList.remove('show-weekends');
+    const days = sourceData.showWeekends ? ['Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    const cols = sourceData.showWeekends ? 7 : 5;
+    
+    // Headers
+    days.forEach(d => { let div = document.createElement('div'); div.className = 'grid-header'; div.innerText = d; grid.appendChild(div); });
+    
+    // Rows
+    for (let i = sourceData.startHour; i <= sourceData.endHour; i++) {
+        let time = document.createElement('div'); time.className = 'time-slot'; time.innerText = `${i}:00`; grid.appendChild(time);
+        for (let j = 0; j < cols; j++) {
+            let key = `${days[j+1]}-${i}`; let slot = document.createElement('div'); slot.className = 'class-slot bubble';
+            if(sourceData.timetableColors && sourceData.timetableColors[key]) slot.style.background = sourceData.timetableColors[key];
+            let input = document.createElement('input'); input.value = sourceData.timetable[key] || ''; 
+            if(isViewingFriend) input.readOnly = true; else input.placeholder = '+';
+            input.onchange = (e) => { if(!isViewingFriend) { appData.timetable[key] = e.target.value; triggerSync(); } };
+            slot.onclick = (e) => { if(!isViewingFriend && selectedColor && e.target !== input) { if(!appData.timetableColors) appData.timetableColors = {}; appData.timetableColors[key] = selectedColor; slot.style.background = selectedColor; triggerSync(); } };
+            slot.appendChild(input); grid.appendChild(slot);
+        }
+    }
+    updateTimeLine();
+}
+function updateTimeLine() {
+    const line = document.getElementById('current-time-line'); const now = new Date(); const currentHour = now.getHours(); const currentMin = now.getMinutes();
+    const headerHeight = 40; const rowHeight = 61; let hoursPastStart = currentHour - appData.startHour;
+    let pixelsDown = headerHeight + (hoursPastStart * rowHeight) + ((currentMin / 60) * rowHeight);
+    const maxPixels = headerHeight + ((appData.endHour - appData.startHour + 1) * rowHeight);
+    if (pixelsDown < headerHeight) pixelsDown = headerHeight; if (pixelsDown > maxPixels) pixelsDown = maxPixels; line.style.top = `${pixelsDown}px`; line.style.display = 'block';
 }
 
-/* --- [KEEP ALL OTHER FUNCTIONS: renderTimetable, updateDashboard, Timer, etc. FROM PREVIOUS STEP] --- */
-/* (Copy paste the Dashboard, Timetable, Study, Timer functions from the previous response here. They were correct.) */
+/* --- OTHER STANDARD FUNCTIONS --- */
+function updateDashboard() {
+    const now = new Date(); const hr = now.getHours();
+    let greet = hr < 12 ? "Good Morning" : hr < 18 ? "Good Afternoon" : "Good Evening";
+    document.getElementById('greet-msg').innerText = `${greet}, ${appData.userName || 'Student'}.`;
+    
+    let verseType = 'morning'; if(hr >= 10 && hr < 15) verseType = 'midday'; if(hr >= 15 && hr < 20) verseType = 'evening'; if(hr >= 20 || hr < 5) verseType = 'night';
+    const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
+    const verses = bibleVerses[verseType]; document.getElementById('daily-quote').innerText = verses[dayOfYear % verses.length];
 
-/* --- ADDED FOR COMPLETENESS: --- */
+    const nextEvent = appData.events.find(e => new Date(e.date) > now);
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; const todayName = dayNames[now.getDay()];
+    let currentClass = appData.timetable[`${todayName}-${hr}`];
+    
+    if(currentClass) { document.getElementById('up-next-display').innerText = `Now: ${currentClass}`; document.getElementById('up-next-sub').innerText = `Check timetable.`; }
+    else if (nextEvent) { const diff = Math.ceil((new Date(nextEvent.date) - now) / (1000*60*60*24)); document.getElementById('up-next-display').innerText = `Upcoming: ${nextEvent.name}`; document.getElementById('up-next-sub').innerText = `In ${diff} days.`; }
+    else { document.getElementById('up-next-display').innerText = "All caught up!"; document.getElementById('up-next-sub').innerText = "Time to relax."; }
+}
+function renderHabits() { const c = document.getElementById('habit-container'); if(!c) return; c.innerHTML = ''; appData.habits.forEach((h, i) => { let div = document.createElement('div'); div.className = 'habit-item'; let today = new Date().toISOString().slice(0,10); if(h.last === today) div.classList.add('done'); div.innerHTML = `<div class="habit-circle"><i class="fas fa-check"></i></div><small>${h.name}</small>`; div.onclick = () => { if(h.last === today) { h.last = null; h.streak--; } else { h.last = today; h.streak++; } triggerSync(); renderHabits(); }; c.appendChild(div); }); }
+function renderTodos() { const l = document.getElementById('todo-list'); if(!l) return; l.innerHTML = ''; appData.todos.forEach((t, i) => { let d = document.createElement('div'); d.className = 'todo-item' + (t.done ? ' done' : ''); d.innerHTML = `<input type="checkbox" ${t.done ? 'checked' : ''}><span>${t.text}</span><i class="fas fa-trash" style="margin-left:auto; cursor:pointer; color:#d9534f;"></i>`; d.querySelector('input').onclick = () => { t.done = !t.done; triggerSync(); renderTodos(); }; d.querySelector('i').onclick = () => { appData.todos.splice(i, 1); triggerSync(); renderTodos(); }; l.appendChild(d); }); }
+function addTodo() { let v = document.getElementById('todo-input').value; if(v) { appData.todos.push({text:v, done:false}); document.getElementById('todo-input').value=''; triggerSync(); renderTodos(); } }
+function downloadPDF() { const element = document.getElementById('capture-area'); element.style.background = appData.theme === 'dark' ? '#2b2b1e' : '#F7F1E1'; html2canvas(element, { scale: 2 }).then(canvas => { const imgData = canvas.toDataURL('image/png'); const { jsPDF } = window.jspdf; const pdf = new jsPDF('l', 'mm', 'a4'); const width = pdf.internal.pageSize.getWidth(); const height = (canvas.height * width) / canvas.width; pdf.addImage(imgData, 'PNG', 0, 10, width, height); pdf.save("VibeTable_Schedule.pdf"); element.style.background = 'transparent'; }); }
+function exportSchedule() { const shareData = { userName: appData.userName, timetable: appData.timetable, timetableColors: appData.timetableColors, startHour: appData.startHour, endHour: appData.endHour, showWeekends: appData.showWeekends }; const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(shareData)); const node = document.createElement('a'); node.setAttribute("href", dataStr); node.setAttribute("download", `${appData.userName || 'My'}_Schedule.vibe.json`); document.body.appendChild(node); node.click(); node.remove(); }
+function importFriendSchedule(input) { const file = input.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = function(e) { friendData = JSON.parse(e.target.result); isViewingFriend = true; document.getElementById('friend-mode-banner').style.display = 'flex'; document.getElementById('friend-mode-banner').querySelector('strong').innerText = `Viewing: ${friendData.userName}'s Schedule`; renderTimetable(); }; reader.readAsText(file); }
+function exitFriendMode() { isViewingFriend = false; friendData = null; document.getElementById('friend-mode-banner').style.display = 'none'; renderTimetable(); }
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('mobile-overlay').classList.toggle('open'); }
-function switchTab(tabId) {
-    document.querySelectorAll('.tab-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; });
-    const target = document.getElementById(tabId);
-    if(target) { target.style.display = 'block'; setTimeout(() => target.classList.add('active'), 10); }
-    if(tabId === 'timetable') { renderTimetable(); updateTimeLine(); }
-    if(tabId === 'dashboard') updateDashboard();
-    if(tabId === 'notes') renderNotes();
-    if(tabId === 'countdowns') { renderEvents(); initHeatmap(); }
-    if(tabId === 'study') renderFlashcard();
-    if(tabId === 'profile') updateProfileUI();
-    if (window.innerWidth <= 768) { document.getElementById('sidebar').classList.remove('open'); document.getElementById('mobile-overlay').classList.remove('open'); }
-}
-
-// ... [Include all the Timetable, Notes, Flashcard, PDF logic from previous response] ...
+function switchTab(tabId) { document.querySelectorAll('.tab-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; }); const target = document.getElementById(tabId); if(target) { target.style.display = 'block'; setTimeout(() => target.classList.add('active'), 10); } if(tabId === 'timetable') { renderTimetable(); updateTimeLine(); } if(tabId === 'dashboard') { updateDashboard(); renderHabits(); renderTodos(); } if(tabId === 'notes') renderNotes(); if(tabId === 'countdowns') { renderEvents(); initHeatmap(); } if(tabId === 'study') renderFlashcard(); if(tabId === 'profile') updateProfileUI(); if (window.innerWidth <= 768) { document.getElementById('sidebar').classList.remove('open'); document.getElementById('mobile-overlay').classList.remove('open'); } }
+function startTimer() { if(timerInterval) return; appData.timerTarget = Date.now() + (25 * 60 * 1000); saveToLocal(); checkTimerState(); }
+function checkTimerState() { if (!appData.timerTarget) return; document.getElementById('btn-start').classList.add('alarm-active'); if (timerInterval) clearInterval(timerInterval); timerInterval = setInterval(() => { const now = Date.now(); const left = Math.round((appData.timerTarget - now) / 1000); if (left <= 0) { triggerAlarm(); } else { let m = Math.floor(left / 60); let s = left % 60; document.getElementById('timer-display').innerText = `${m}:${s < 10 ? '0' : ''}${s}`; } }, 1000); }
+function pauseTimer() { clearInterval(timerInterval); timerInterval = null; appData.timerTarget = null; saveToLocal(); document.getElementById('btn-start').classList.remove('alarm-active'); }
+function resetTimer() { pauseTimer(); document.getElementById('timer-display').innerText = "25:00"; }
+function triggerAlarm() { clearInterval(timerInterval); timerInterval = null; appData.timerTarget = null; saveToLocal(); document.getElementById('btn-start').classList.remove('alarm-active'); document.getElementById('timer-display').innerText = "00:00"; audio.currentTime = 0; audio.play(); setTimeout(() => audio.play(), 1000); setTimeout(() => audio.play(), 2000); if (Notification.permission === "granted") new Notification("VibeTable: Focus time is up!"); else alert("TIME IS UP!"); }
+function requestNotification() { if (Notification.permission !== "granted") Notification.requestPermission(); audio.play().then(() => audio.pause()); }
+function addFlashcard() { let q = document.getElementById('fc-q').value; let a = document.getElementById('fc-a').value; if(q && a) { if(!appData.flashcards) appData.flashcards = []; appData.flashcards.push({q, a}); document.getElementById('fc-q').value = ''; document.getElementById('fc-a').value = ''; triggerSync(); renderFlashcard(); } }
+let currentCard = 0;
+function renderFlashcard() { const front = document.getElementById('card-front-text'); const back = document.getElementById('card-back-text'); const counter = document.getElementById('card-counter'); if(!appData.flashcards || appData.flashcards.length === 0) { front.innerText = "No cards yet."; back.innerText = "Add one below!"; counter.innerText = "0 / 0"; return; } if(currentCard >= appData.flashcards.length) currentCard = 0; if(currentCard < 0) currentCard = appData.flashcards.length - 1; front.innerText = appData.flashcards[currentCard].q; back.innerText = appData.flashcards[currentCard].a; counter.innerText = `${currentCard + 1} / ${appData.flashcards.length}`; document.getElementById('flashcard-display').classList.remove('flipped'); }
+function flipCard() { document.getElementById('flashcard-display').classList.toggle('flipped'); } function nextCard() { currentCard++; renderFlashcard(); } function prevCard() { currentCard--; renderFlashcard(); }
+function initHeatmap() { const grid = document.getElementById('heatmap-grid'); if(!grid) return; grid.innerHTML = ''; const now = new Date(); const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(); for(let i=1; i<=daysInMonth; i++) { let dayDiv = document.createElement('div'); dayDiv.className = 'heat-day'; dayDiv.innerText = i; let count = 0; appData.events.forEach(e => { let d = new Date(e.date); if(d.getDate() === i && d.getMonth() === now.getMonth()) count++; }); if(count > 0) dayDiv.classList.add(count > 1 ? 'heat-level-2' : 'heat-level-1'); grid.appendChild(dayDiv); } }
+function initScrollPickers() { populateWheel('picker-day', 1, 31); populateWheel('picker-month', 1, 12); populateWheel('picker-year', 2025, 2030); populateWheel('picker-hour', 0, 23); populateWheel('picker-minute', 0, 59); }
+function populateWheel(id, min, max) { const el = document.getElementById(id); if(!el) return; el.innerHTML = '<div style="height:70px; width:100%"></div>'; for(let i=min; i<=max; i++) { let item = document.createElement('div'); item.className = 'picker-item'; item.innerText = i < 10 ? '0'+i : i; item.dataset.val = i; el.appendChild(item); } el.innerHTML += '<div style="height:70px; width:100%"></div>'; }
+function getWheelVal(id) { const el = document.getElementById(id); if(!el) return 0; let index = Math.round(el.scrollTop / 40); let target = el.children[index + 1]; return target ? parseInt(target.dataset.val) : 0; }
+function addEvent() { let name = document.getElementById('event-name').value; let y = getWheelVal('picker-year') || 2025; let m = (getWheelVal('picker-month') || 1) - 1; let d = getWheelVal('picker-day') || 1; let h = getWheelVal('picker-hour') || 9; let min = getWheelVal('picker-minute') || 0; if(name) { let date = new Date(y, m, d, h, min); appData.events.push({name, date: date.toISOString()}); renderEvents(); triggerSync(); alert('Saved!'); } }
+function renderEvents() { const c = document.getElementById('countdown-container'); if(!c) return; c.innerHTML = ''; appData.events.forEach((e, i) => { let diff = new Date(e.date) - new Date(); let days = Math.floor(diff / (1000*60*60*24)); let div = document.createElement('div'); div.className = 'glass-panel bubble'; div.innerHTML = `<h3>${e.name}</h3><h1 style="color:var(--accent);">${days} Days</h1><button onclick="delEvent(${i})" style="color:red;border:none;background:none;cursor:pointer;">Delete</button>`; c.appendChild(div); }); }
+function delEvent(i) { appData.events.splice(i, 1); renderEvents(); triggerSync(); }
+function renderGroups() { const sel = document.getElementById('note-group-select'); const fil = document.getElementById('note-group-filter'); if(!sel) return; const curVal = fil.value; sel.innerHTML = ''; fil.innerHTML = '<option value="All">All Groups</option>'; if(!appData.noteGroups) appData.noteGroups = ['General']; appData.noteGroups.forEach(g => { sel.innerHTML += `<option value="${g}">${g}</option>`; fil.innerHTML += `<option value="${g}">${g}</option>`; }); fil.value = curVal; }
+function manageGroups() { let action = prompt("Type: 'new', 'rename', or 'delete'"); if(!action) return; action = action.toLowerCase(); if(action === 'new') { if(appData.noteGroups.length >= 20) return alert("Max 20 groups allowed."); let g = prompt("New Group Name:"); if(g) { appData.noteGroups.push(g); renderGroups(); triggerSync(); } } else if (action === 'rename') { let current = document.getElementById('note-group-filter').value; if(current === 'All' || current === 'General') return alert("Cannot rename All or General."); let newName = prompt("Rename " + current + " to:"); if(newName) { let idx = appData.noteGroups.indexOf(current); if(idx > -1) appData.noteGroups[idx] = newName; appData.notes.forEach(n => { if(n.group === current) n.group = newName; }); renderGroups(); renderNotes(); triggerSync(); } } else if (action === 'delete') { let current = document.getElementById('note-group-filter').value; if(current === 'All' || current === 'General') return alert("Cannot delete All or General."); if(confirm("Delete " + current + "? Notes will move to General.")) { let idx = appData.noteGroups.indexOf(current); if(idx > -1) appData.noteGroups.splice(idx, 1); appData.notes.forEach(n => { if(n.group === current) n.group = "General"; }); document.getElementById('note-group-filter').value = 'All'; renderGroups(); renderNotes(); triggerSync(); } } }
+function createNewNote() { appData.notes.push({title:"New Note", body:"", group:"General"}); renderNotes(); loadNote(appData.notes.length-1); triggerSync(); }
+function renderNotes() { const list = document.getElementById('note-list'); const filter = document.getElementById('note-group-filter').value; if(!list) return; list.innerHTML = ''; appData.notes.forEach((n, i) => { if(filter === 'All' || n.group === filter) { let btn = document.createElement('button'); btn.className = 'nav-btn'; btn.innerHTML = `<div><span style="font-weight:bold">${n.title}</span><br><small style="opacity:0.7">${n.group}</small></div>`; btn.onclick = () => loadNote(i); list.appendChild(btn); } }); }
+function loadNote(i) { let n = appData.notes[i]; document.getElementById('note-title').value = n.title; document.getElementById('note-body').innerHTML = n.body; document.getElementById('note-group-select').value = n.group; document.getElementById('note-title').oninput = (e) => appData.notes[i].title = e.target.value; document.getElementById('note-group-select').onchange = (e) => { appData.notes[i].group = e.target.value; triggerSync(); renderNotes(); }; document.getElementById('note-body').onblur = function() { appData.notes[i].body = this.innerHTML; triggerSync(); }; }
+function filterNotes() { renderNotes(); }
+function updateNoteGroup() { /* Handled inline */ }
+function saveProfile() { appData.userName = document.getElementById('edit-name').value; triggerSync(); updateProfileUI(); alert("Profile Saved"); }
+function updateProfileUI() { if(appData.userName) { document.getElementById('dash-name').innerText = appData.userName; document.getElementById('edit-name').value = appData.userName; } if(appData.userPic) { document.getElementById('sidebar-pic').src = appData.userPic; document.getElementById('profile-pic-large').src = appData.userPic; } if(appData.theme === 'dark') document.body.setAttribute('data-theme', 'dark'); }
+function toggleTheme() { if(document.body.hasAttribute('data-theme')) { document.body.removeAttribute('data-theme'); appData.theme = 'light'; } else { document.body.setAttribute('data-theme', 'dark'); appData.theme = 'dark'; } triggerSync(); }
+function insertTemplate(type) { let t = ""; if(type === 'legal') t = "<b>Case Name:</b><br><b>Citation:</b><br><b>Facts:</b><br><br><b>Legal Issue:</b><br><br><b>Judgment:</b><br><br><b>Ratio Decidendi:</b><br>"; if(type === 'meeting') t = "<b>Meeting:</b><br><b>Date:</b><br><b>Attendees:</b><br><br><b>Key Points:</b><br>1.<br>2.<br><br><b>Action Items:</b><br>"; document.getElementById('note-body').innerHTML += t; }
+function renderColorPickers() { const c = document.getElementById('timetable-colors'); const h = document.getElementById('highlighter-toolbar'); if(!c) return; c.innerHTML = ''; h.innerHTML = ''; palette.forEach(col => { let dot = document.createElement('div'); dot.className = 'color-dot'; dot.style.background = col; dot.onclick = () => { selectedColor = col; }; c.appendChild(dot); let hl = document.createElement('div'); hl.className = 'hl-btn'; hl.style.background = col; hl.onmousedown = (e) => { e.preventDefault(); document.execCommand('hiliteColor', false, col); }; h.appendChild(hl); }); }
+function setupDragDrop() { const zone = document.getElementById('drop-zone'); if(!zone) return; zone.ondragover = (e) => { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; }; zone.ondragleave = (e) => { e.preventDefault(); zone.style.borderColor = 'var(--primary)'; }; zone.ondrop = (e) => { e.preventDefault(); zone.style.borderColor = 'var(--primary)'; const file = e.dataTransfer.files[0]; if(file && file.type.startsWith('image/')) { const reader = new FileReader(); reader.onload = (event) => { appData.userPic = event.target.result; triggerSync(); alert("Profile picture updated!"); }; reader.readAsDataURL(file); } }; }
+const palette = ['#E3D8C1', '#CEC1A8', '#B59E7D', '#AAA396', '#E6CBB8', '#B4833D', '#81754B', '#584738', '#B8E6C1'];
