@@ -1,21 +1,83 @@
-{
-  "name": "VibeTable",
-  "short_name": "VibeTable",
-  "start_url": "index.html",
-  "display": "standalone",
-  "background_color": "#F7F1E1",
-  "theme_color": "#81754B",
-  "orientation": "portrait",
-  "icons": [
-    {
-      "src": "https://cdn-icons-png.flaticon.com/512/3233/3233497.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "https://cdn-icons-png.flaticon.com/512/3233/3233497.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ]
-}
+[
+  {
+    "day": "Monday",
+    "schedule": [
+      { "time": "07:00 - 08:00", "activity": "Bible Session 1", "type": "bible" },
+      { "time": "08:00 - 09:00", "activity": "Gym Session 1", "type": "gym" },
+      { "time": "09:00 - 10:00", "activity": "Shower / Breakfast", "type": "food" },
+      { "time": "10:00 - 13:00", "activity": "CLASS: LWCTA3-B11", "type": "class" },
+      { "time": "13:00 - 14:00", "activity": "Lunch", "type": "food" },
+      { "time": "14:00 - 16:00", "activity": "Unwind / Code", "type": "code" },
+      { "time": "16:00 - 17:00", "activity": "Study Session", "type": "study" },
+      { "time": "17:00 - 18:00", "activity": "Gym Session 2", "type": "gym" },
+      { "time": "18:00 - 19:00", "activity": "Shower / Dinner", "type": "food" },
+      { "time": "19:00 - 20:00", "activity": "Bible Session 2", "type": "bible" },
+      { "time": "20:00 - 22:00", "activity": "Relax / Sleep", "type": "relax" }
+    ]
+  },
+  {
+    "day": "Tuesday",
+    "schedule": [
+      { "time": "07:00 - 08:00", "activity": "Bible Session 1", "type": "bible" },
+      { "time": "08:00 - 09:00", "activity": "Gym Session 1", "type": "gym" },
+      { "time": "09:00 - 10:00", "activity": "Shower / Breakfast", "type": "food" },
+      { "time": "10:00 - 13:00", "activity": "Unwind / Code", "type": "code" },
+      { "time": "13:00 - 14:00", "activity": "Lunch", "type": "food" },
+      { "time": "14:00 - 16:00", "activity": "Study Session", "type": "study" },
+      { "time": "16:00 - 17:00", "activity": "Unwind / Code", "type": "code" },
+      { "time": "17:00 - 18:00", "activity": "Gym Session 2", "type": "gym" },
+      { "time": "18:00 - 19:00", "activity": "Shower / Dinner", "type": "food" },
+      { "time": "19:00 - 20:00", "activity": "Bible Session 2", "type": "bible" },
+      { "time": "20:00 - 22:00", "activity": "Relax / Sleep", "type": "relax" }
+    ]
+  },
+  {
+    "day": "Wednesday",
+    "schedule": [
+      { "time": "07:00 - 08:00", "activity": "Bible Session 1", "type": "bible" },
+      { "time": "08:00 - 09:00", "activity": "Gym Session 1", "type": "gym" },
+      { "time": "09:00 - 10:00", "activity": "Shower / Prayer (Fasting)", "type": "bible" },
+      { "time": "10:00 - 13:00", "activity": "Unwind / Code", "type": "code" },
+      { "time": "13:00 - 14:00", "activity": "Mid-Day Prayer (Fasting)", "type": "bible" },
+      { "time": "14:00 - 16:00", "activity": "Study Session", "type": "study" },
+      { "time": "16:00 - 17:00", "activity": "Unwind / Code", "type": "code" },
+      { "time": "17:00 - 18:00", "activity": "Gym Session 2", "type": "gym" },
+      { "time": "18:00 - 19:00", "activity": "Break Fast / Dinner", "type": "food" },
+      { "time": "19:00 - 20:00", "activity": "Bible Session 2", "type": "bible" },
+      { "time": "20:00 - 22:00", "activity": "Relax / Sleep", "type": "relax" }
+    ]
+  },
+  {
+    "day": "Thursday",
+    "schedule": [
+      { "time": "07:00 - 08:00", "activity": "Bible Session 1", "type": "bible" },
+      { "time": "08:00 - 09:00", "activity": "Gym Session 1", "type": "gym" },
+      { "time": "09:00 - 10:00", "activity": "Shower / Breakfast", "type": "food" },
+      { "time": "10:00 - 13:00", "activity": "Unwind / Code", "type": "code" },
+      { "time": "13:00 - 14:00", "activity": "Lunch", "type": "food" },
+      { "time": "14:00 - 16:00", "activity": "Study Session", "type": "study" },
+      { "time": "16:00 - 17:00", "activity": "Unwind / Code", "type": "code" },
+      { "time": "17:00 - 18:00", "activity": "Gym Session 2", "type": "gym" },
+      { "time": "18:00 - 19:00", "activity": "Shower / Dinner", "type": "food" },
+      { "time": "19:00 - 20:00", "activity": "Bible Session 2", "type": "bible" },
+      { "time": "20:00 - 22:00", "activity": "Relax / Sleep", "type": "relax" }
+    ]
+  },
+  {
+    "day": "Friday",
+    "schedule": [
+      { "time": "07:00 - 08:00", "activity": "Bible Session 1", "type": "bible" },
+      { "time": "08:00 - 09:00", "activity": "Gym Session 1", "type": "gym" },
+      { "time": "09:00 - 10:00", "activity": "Shower / Prayer (Fasting)", "type": "bible" },
+      { "time": "10:00 - 11:00", "activity": "Unwind / Code", "type": "code" },
+      { "time": "11:00 - 12:00", "activity": "CLASS: COISA3-B14", "type": "class" },
+      { "time": "12:00 - 13:00", "activity": "Mid-Day Prayer (Fasting)", "type": "bible" },
+      { "time": "13:00 - 15:00", "activity": "Unwind / Code", "type": "code" },
+      { "time": "15:00 - 17:00", "activity": "CLASS: CORLA3-B11", "type": "class" },
+      { "time": "17:00 - 18:00", "activity": "Gym Session 2", "type": "gym" },
+      { "time": "18:00 - 19:00", "activity": "Break Fast / Dinner", "type": "food" },
+      { "time": "19:00 - 20:00", "activity": "Bible Session 2", "type": "bible" },
+      { "time": "20:00 - 22:00", "activity": "Relax / Sleep", "type": "relax" }
+    ]
+  }
+]
