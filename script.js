@@ -1,21 +1,18 @@
-/* VibeTable Logic - Mobile Optimized & Custom Colors */
+/* VibeTable Logic - Final Fixes */
 
 const CLIENT_ID = '951024875343-365jk5cjfkjbg8co3elc75jn41pe0ama.apps.googleusercontent.com'; 
-const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
+const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile';
 
-// --- DEFAULT STATE ---
 let appData = { 
-    userName: "Guest", userPic: null, theme: 'light',
+    userName: "Student", userPic: null, theme: 'light',
     events: [], timetable: {}, timetableColors: {}, 
     startHour: 7, endHour: 23, showWeekends: false,
-    notes: [], noteGroups: ['General'], flashcards: [],
-    habits: [{name: "Habit 1", streak: 0, last: null}],
+    notes: [], noteGroups: ['Group 1', 'Group 2'], flashcards: [],
+    habits: [{name: "Read", streak: 0, last: null}, {name: "Gym", streak: 0, last: null}, {name: "Water", streak: 0, last: null}],
     todos: [], timerTarget: null 
 };
-
 let accessToken = null;
 let driveFileId = null;
-let selectedColor = null; // Holds the currently selected color
 let audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg'); 
 let timerInterval;
 let friendData = null; 
@@ -39,54 +36,74 @@ window.onload = function() {
     addAssessmentRow();
 };
 
-/* --- AUTHENTICATION --- */
-function initGoogleAuth() { try { tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: async (r) => { if(r.access_token) { accessToken = r.access_token; await handleLogin(); } } }); } catch(e) {} }
-function handleAuthClick() { tokenClient.requestAccessToken(); }
-
-async function handleLogin() { 
-    if(document.getElementById('login-screen')) document.getElementById('login-screen').remove(); 
-    document.getElementById('app-screen').classList.remove('hidden'); 
-    document.getElementById('app-screen').classList.add('active'); 
+/* --- NAVIGATION & SIDEBAR --- */
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('mobile-overlay');
     
-    let res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {headers:{'Authorization':'Bearer '+accessToken}}); 
-    let user = await res.json(); 
-    
-    if(user.picture) document.getElementById('sidebar-pic').src = user.picture; 
-    
-    await loadData(); 
-    
-    if (user.email === 'mbusophiri01@gmail.com') {
-        if (Object.keys(appData.timetable).length === 0) {
-            appData = JSON.parse(JSON.stringify(MBUSO_SETUP)); 
-            appData.userName = user.name;
-            appData.userPic = user.picture;
-            triggerSync(); 
-        }
+    // Check if Mobile or Desktop
+    if (window.innerWidth <= 768) {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('open');
     } else {
-        if (!appData.userName || appData.userName === "Guest") { appData.userName = user.name; }
+        sidebar.classList.toggle('closed');
     }
-    
-    if(appData.userName) document.getElementById('dash-name').innerText = appData.userName; 
-    updateSyncUI(true); refreshAllUI();
 }
 
-/* --- SYNC & DATA --- */
-const CURRENT_FILE = 'vibetable_v13.json'; 
-function checkSession() { const lastActive = localStorage.getItem('vibetable_last_active'); const now = Date.now(); if (lastActive && (now - lastActive > 1800000)) { document.getElementById('login-screen').style.display = 'flex'; document.getElementById('app-screen').classList.add('hidden'); } else { loadFromLocal(); } updateActivity(); }
-function updateActivity() { localStorage.setItem('vibetable_last_active', Date.now()); }
-function saveToLocal() { localStorage.setItem('vibetable_data', JSON.stringify(appData)); updateSyncUI(); }
-function loadFromLocal() { const local = localStorage.getItem('vibetable_data'); if (local) { appData = JSON.parse(local); if(!appData.habits) appData.habits = [{name:"Read", streak:0, last:null}]; if(document.getElementById('login-screen')) document.getElementById('login-screen').remove(); document.getElementById('app-screen').classList.remove('hidden'); document.getElementById('app-screen').classList.add('active'); refreshAllUI(); } }
-async function triggerSync() { saveToLocal(); if(accessToken) { await saveDataToDrive(); alert("Synced!"); } else { handleAuthClick(); } }
-function updateSyncUI(isSynced = false) { const badge = document.getElementById('sync-status'); if(accessToken) { badge.className = 'status-badge online'; badge.innerHTML = '<i class="fas fa-check-circle"></i> <span>Synced</span>'; } else { badge.className = 'status-badge offline'; badge.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> <span>Offline Mode</span>'; } }
-async function loadData() { try { let q = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='" + CURRENT_FILE + "'"; let r = await fetch(q, {headers:{'Authorization':'Bearer '+accessToken}}); if(r.status === 401) return; let d = await r.json(); if(d.files && d.files.length > 0) { driveFileId = d.files[0].id; let f = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {headers:{'Authorization':'Bearer '+accessToken}}); appData = await f.json(); saveToLocal(); refreshAllUI(); } } catch(e) { console.error(e); } }
-async function saveDataToDrive() { if(!accessToken) return; const boundary = '-------314159265358979323846'; const delimiter = "\r\n--" + boundary + "\r\n"; const close_delim = "\r\n--" + boundary + "--"; const metadata = { name: CURRENT_FILE, mimeType: 'application/json', parents: ['appDataFolder'] }; const body = delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(metadata) + delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(appData) + close_delim; let path = '/upload/drive/v3/files?uploadType=multipart'; let method = 'POST'; if(driveFileId) { path = `/upload/drive/v3/files/${driveFileId}?uploadType=multipart`; method = 'PATCH'; } await fetch('https://www.googleapis.com' + path, { method: method, headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"', 'Authorization': 'Bearer ' + accessToken }, body: body }); updateSyncUI(true); }
-function refreshAllUI() { renderTimetable(); updateTimeLine(); updateDashboard(); renderNotes(); renderHabits(); renderTodos(); initHeatmap(); }
+function switchTab(tabId) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; });
+    
+    // Show selected tab
+    const target = document.getElementById(tabId);
+    if(target) { target.style.display = 'block'; setTimeout(() => target.classList.add('active'), 10); }
+    
+    // HIGHLIGHT FIX: Remove 'active' from all nav buttons
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+    // Add 'active' to current button
+    const btn = document.getElementById('btn-' + tabId);
+    if(btn) btn.classList.add('active');
 
-/* --- NAVIGATION --- */
-function toggleSidebar() { const sidebar = document.getElementById('sidebar'); const overlay = document.getElementById('mobile-overlay'); if (window.innerWidth <= 768) { sidebar.classList.toggle('open'); overlay.classList.toggle('open'); } else { sidebar.classList.toggle('closed'); } }
-function switchTab(tabId) { document.querySelectorAll('.tab-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; }); const target = document.getElementById(tabId); if(target) { target.style.display = 'block'; setTimeout(() => target.classList.add('active'), 10); } document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active')); const btn = document.getElementById('btn-' + tabId); if(btn) btn.classList.add('active'); if(tabId === 'timetable') { renderTimetable(); updateTimeLine(); } if(tabId === 'dashboard') { updateDashboard(); renderHabits(); renderTodos(); } if(tabId === 'notes') renderNotes(); if(tabId === 'countdowns') { renderEvents(); initHeatmap(); } if(tabId === 'study') renderFlashcard(); if(tabId === 'profile') updateProfileUI(); if (window.innerWidth <= 768) { document.getElementById('sidebar').classList.remove('open'); document.getElementById('mobile-overlay').classList.remove('open'); } }
+    // Run Tab Specifics
+    if(tabId === 'timetable') { renderTimetable(); updateTimeLine(); }
+    if(tabId === 'dashboard') { updateDashboard(); renderHabits(); renderTodos(); }
+    if(tabId === 'notes') renderNotes();
+    if(tabId === 'countdowns') { renderEvents(); initHeatmap(); }
+    if(tabId === 'study') renderFlashcard();
+    if(tabId === 'profile') updateProfileUI();
+    
+    // Mobile Auto-Close
+    if (window.innerWidth <= 768) { document.getElementById('sidebar').classList.remove('open'); document.getElementById('mobile-overlay').classList.remove('open'); }
+}
 
-/* --- TIMETABLE LOGIC (With Ghost Column & Better Highlighting) --- */
+/* --- GRADE CALCULATOR --- */
+function addAssessmentRow() {
+    const div = document.createElement('div'); div.className = 'grade-row';
+    div.innerHTML = `<input type="text" class="bubble-input asm-name" placeholder="Name" style="margin:0; padding:8px;"><input type="number" class="bubble-input asm-mark" placeholder="Mark %" style="margin:0; padding:8px;"><input type="number" class="bubble-input asm-weight" placeholder="Wght %" style="margin:0; padding:8px;"><i class="fas fa-trash" style="color: #d9534f; cursor: pointer; align-self: center;" onclick="this.parentElement.remove()"></i>`;
+    document.getElementById('assessment-list').appendChild(div);
+}
+function calcAdvancedGrade() {
+    const rows = document.querySelectorAll('.grade-row');
+    let totalAccumulated = 0; let totalWeightUsed = 0;
+    rows.forEach(row => {
+        const mark = parseFloat(row.querySelector('.asm-mark').value) || 0;
+        const weight = parseFloat(row.querySelector('.asm-weight').value) || 0;
+        totalAccumulated += (mark * (weight / 100)); totalWeightUsed += weight;
+    });
+    const target = parseInt(document.getElementById('grade-target').value);
+    const remainingWeight = 100 - totalWeightUsed;
+    const resultDiv = document.getElementById('grade-result'); resultDiv.style.display = 'block';
+    
+    if (remainingWeight <= 0) { resultDiv.innerHTML = `Total Mark: <b>${Math.round(totalAccumulated)}%</b><br>Weights used up.`; return; }
+    
+    const neededPoints = target - totalAccumulated;
+    const requiredExamMark = (neededPoints / remainingWeight) * 100;
+    let color = requiredExamMark > 100 ? '#d9534f' : '#155724';
+    let msg = requiredExamMark > 100 ? "Impossible (Need > 100%)" : `<b>${Math.round(requiredExamMark)}%</b>`;
+    resultDiv.innerHTML = `Current Year Mark: <b>${Math.round(totalAccumulated)}%</b> (of ${totalWeightUsed}%)<br>Required on Final (${remainingWeight}%) for ${target}%:<br><span style="font-size: 1.5rem; color: ${color};">${msg}</span>`;
+}
+
+/* --- TIMETABLE --- */
 function toggleWeekends() { appData.showWeekends = !appData.showWeekends; triggerSync(); renderTimetable(); }
 function modifyTimetable(end, action) { if (action === 'add') { if(end === 'start' && appData.startHour > 0) appData.startHour--; if(end === 'end' && appData.endHour < 24) appData.endHour++; } else { if(end === 'start' && appData.startHour < appData.endHour) appData.startHour++; if(end === 'end' && appData.endHour > appData.startHour) appData.endHour--; } triggerSync(); renderTimetable(); }
 
@@ -94,61 +111,27 @@ function renderTimetable() {
     const grid = document.getElementById('timetable-grid'); if(!grid) return; grid.innerHTML = ''; 
     const sourceData = isViewingFriend ? friendData : appData;
     if(sourceData.showWeekends) grid.classList.add('show-weekends'); else grid.classList.remove('show-weekends');
-    const days = sourceData.showWeekends ? ['Time', '', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['Time', '', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    const days = sourceData.showWeekends ? ['Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    const cols = sourceData.showWeekends ? 7 : 5;
     
-    // HEADERS
-    days.forEach((d, index) => { 
-        let div = document.createElement('div'); 
-        div.className = 'grid-header'; 
-        if(index === 0) div.classList.add('sticky-col'); 
-        if(index === 1) div.className = 'ghost-col sticky-col'; // Ghost Header
-        div.innerText = d; 
-        grid.appendChild(div); 
-    });
+    // Headers
+    days.forEach((d, index) => { let div = document.createElement('div'); div.className = 'grid-header'; if(index === 0) div.classList.add('sticky-col'); div.innerText = d; grid.appendChild(div); });
     
-    // ROWS
+    // Rows
     for (let i = sourceData.startHour; i <= sourceData.endHour; i++) {
-        // Time Slot (Sticky)
         let time = document.createElement('div'); time.className = 'time-slot sticky-col'; time.innerText = `${i}:00`; grid.appendChild(time);
-        
-        // Ghost Slot (Spacer)
-        let ghost = document.createElement('div'); ghost.className = 'ghost-col'; grid.appendChild(ghost);
-
-        // Data Slots
-        let dayKeys = sourceData.showWeekends ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-        for (let j = 0; j < dayKeys.length; j++) {
-            let key = `${dayKeys[j]}-${i}`; 
-            let slot = document.createElement('div'); 
-            slot.className = 'class-slot bubble';
-            
-            // Apply Saved Color
+        for (let j = 0; j < cols; j++) {
+            let key = `${days[j+1]}-${i}`; let slot = document.createElement('div'); slot.className = 'class-slot bubble';
             if(sourceData.timetableColors && sourceData.timetableColors[key]) slot.style.background = sourceData.timetableColors[key];
-            
-            let input = document.createElement('input'); 
-            input.value = sourceData.timetable[key] || ''; 
+            let input = document.createElement('input'); input.value = sourceData.timetable[key] || ''; 
             if(isViewingFriend) input.readOnly = true; else input.placeholder = '+';
-            
-            input.onchange = (e) => { 
-                if(!isViewingFriend) { appData.timetable[key] = e.target.value; triggerSync(); } 
-            };
-            
-            // FIXED CLICK LOGIC: Apply color even if clicking input, provided a color is selected
-            slot.onclick = (e) => { 
-                if(!isViewingFriend && selectedColor) { 
-                    if(!appData.timetableColors) appData.timetableColors = {}; 
-                    appData.timetableColors[key] = selectedColor; 
-                    slot.style.background = selectedColor; 
-                    triggerSync(); 
-                } 
-            };
-            
-            slot.appendChild(input); 
-            grid.appendChild(slot);
+            input.onchange = (e) => { if(!isViewingFriend) { appData.timetable[key] = e.target.value; triggerSync(); } };
+            slot.onclick = (e) => { if(!isViewingFriend && selectedColor && e.target !== input) { if(!appData.timetableColors) appData.timetableColors = {}; appData.timetableColors[key] = selectedColor; slot.style.background = selectedColor; triggerSync(); } };
+            slot.appendChild(input); grid.appendChild(slot);
         }
     }
     updateTimeLine();
 }
-
 function updateTimeLine() {
     const line = document.getElementById('current-time-line'); const now = new Date(); const currentHour = now.getHours(); const currentMin = now.getMinutes();
     const headerHeight = 40; const rowHeight = 61; let hoursPastStart = currentHour - appData.startHour;
@@ -157,41 +140,22 @@ function updateTimeLine() {
     if (pixelsDown < headerHeight) pixelsDown = headerHeight; if (pixelsDown > maxPixels) pixelsDown = maxPixels; line.style.top = `${pixelsDown}px`; line.style.display = 'block';
 }
 
-/* --- COLOR PICKER (With Custom Multi-Color) --- */
-function renderColorPickers() { 
-    const c = document.getElementById('timetable-colors'); if(!c) return; c.innerHTML = ''; 
-    
-    // Default Palette
-    palette.forEach(col => { 
-        let dot = document.createElement('div'); 
-        dot.className = 'color-dot'; 
-        dot.style.background = col; 
-        dot.onclick = () => { 
-            selectedColor = col; 
-            highlightActiveColor(dot);
-        }; 
-        c.appendChild(dot); 
-    });
+/* --- SESSION, SYNC, AUTH --- */
+function checkSession() { const lastActive = localStorage.getItem('vibetable_last_active'); const now = Date.now(); if (lastActive && (now - lastActive > 1800000)) { document.getElementById('login-screen').style.display = 'flex'; document.getElementById('app-screen').classList.add('hidden'); } else { loadFromLocal(); } updateActivity(); }
+function updateActivity() { localStorage.setItem('vibetable_last_active', Date.now()); }
+function saveToLocal() { localStorage.setItem('vibetable_data', JSON.stringify(appData)); updateSyncUI(); }
+function loadFromLocal() { const local = localStorage.getItem('vibetable_data'); if (local) { appData = JSON.parse(local); if(!appData.habits) appData.habits = [{name:"Read", streak:0, last:null}]; if(!appData.todos) appData.todos = []; if(document.getElementById('login-screen')) document.getElementById('login-screen').remove(); document.getElementById('app-screen').classList.remove('hidden'); document.getElementById('app-screen').classList.add('active'); refreshAllUI(); } }
+async function triggerSync() { saveToLocal(); if(accessToken) { await saveDataToDrive(); alert("Synced!"); } else { handleAuthClick(); } }
+function updateSyncUI(isSynced = false) { const badge = document.getElementById('sync-status'); if(accessToken) { badge.className = 'status-badge online'; badge.innerHTML = '<i class="fas fa-check-circle"></i> <span>Synced</span>'; } else { badge.className = 'status-badge offline'; badge.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> <span>Offline Mode</span>'; } }
+function initGoogleAuth() { try { tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: async (r) => { if(r.access_token) { accessToken = r.access_token; await handleLogin(); } } }); } catch(e) {} }
+function handleAuthClick() { tokenClient.requestAccessToken(); }
+async function handleLogin() { if(document.getElementById('login-screen')) document.getElementById('login-screen').remove(); document.getElementById('app-screen').classList.remove('hidden'); document.getElementById('app-screen').classList.add('active'); let res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {headers:{'Authorization':'Bearer '+accessToken}}); let user = await res.json(); if(user.picture) document.getElementById('sidebar-pic').src = user.picture; await loadData(); if(appData.userName) document.getElementById('dash-name').innerText = appData.userName; updateSyncUI(true); }
+const CURRENT_FILE = 'vibetable_v13.json'; 
+async function loadData() { try { let q = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='" + CURRENT_FILE + "'"; let r = await fetch(q, {headers:{'Authorization':'Bearer '+accessToken}}); if(r.status === 401) return; let d = await r.json(); if(d.files && d.files.length > 0) { driveFileId = d.files[0].id; let f = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {headers:{'Authorization':'Bearer '+accessToken}}); appData = await f.json(); saveToLocal(); refreshAllUI(); } } catch(e) { console.error(e); } }
+async function saveDataToDrive() { if(!accessToken) return; const boundary = '-------314159265358979323846'; const delimiter = "\r\n--" + boundary + "\r\n"; const close_delim = "\r\n--" + boundary + "--"; const metadata = { name: CURRENT_FILE, mimeType: 'application/json', parents: ['appDataFolder'] }; const body = delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(metadata) + delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(appData) + close_delim; let path = '/upload/drive/v3/files?uploadType=multipart'; let method = 'POST'; if(driveFileId) { path = `/upload/drive/v3/files/${driveFileId}?uploadType=multipart`; method = 'PATCH'; } await fetch('https://www.googleapis.com' + path, { method: method, headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"', 'Authorization': 'Bearer ' + accessToken }, body: body }); updateSyncUI(true); }
+function refreshAllUI() { renderTimetable(); updateTimeLine(); updateDashboard(); renderNotes(); renderHabits(); renderTodos(); initHeatmap(); }
 
-    // Custom Color Picker (Multi-Color)
-    let customWrap = document.createElement('div');
-    customWrap.className = 'custom-picker-wrapper';
-    customWrap.title = "Pick any color";
-    customWrap.innerHTML = '<input type="color" id="custom-color-input">';
-    customWrap.oninput = (e) => {
-        selectedColor = e.target.value;
-        customWrap.style.borderColor = selectedColor;
-    };
-    c.appendChild(customWrap);
-}
-
-function highlightActiveColor(activeDot) {
-    document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
-    document.querySelectorAll('.custom-picker-wrapper').forEach(d => d.style.border = '2px solid white');
-    activeDot.classList.add('active');
-}
-
-/* --- OTHER UI & LOGIC (Standard VibeTable Features) --- */
+/* --- OTHER --- */
 function updateDashboard() { const now = new Date(); const hr = now.getHours(); let greet = hr < 12 ? "Good Morning" : hr < 18 ? "Good Afternoon" : "Good Evening"; document.getElementById('greet-msg').innerText = `${greet}, ${appData.userName || 'Student'}.`; let verseType = 'morning'; if(hr >= 10 && hr < 15) verseType = 'midday'; if(hr >= 15 && hr < 20) verseType = 'evening'; if(hr >= 20 || hr < 5) verseType = 'night'; const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24); const verses = bibleVerses[verseType]; document.getElementById('daily-quote').innerText = verses[dayOfYear % verses.length]; const nextEvent = appData.events.find(e => new Date(e.date) > now); const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; const todayName = dayNames[now.getDay()]; let currentClass = appData.timetable[`${todayName}-${hr}`]; if(currentClass) { document.getElementById('up-next-display').innerText = `Now: ${currentClass}`; document.getElementById('up-next-sub').innerText = `Check timetable.`; } else if (nextEvent) { const diff = Math.ceil((new Date(nextEvent.date) - now) / (1000*60*60*24)); document.getElementById('up-next-display').innerText = `Upcoming: ${nextEvent.name}`; document.getElementById('up-next-sub').innerText = `In ${diff} days.`; } else { document.getElementById('up-next-display').innerText = "All caught up!"; document.getElementById('up-next-sub').innerText = "Time to relax."; } }
 function renderHabits() { const c = document.getElementById('habit-container'); if(!c) return; c.innerHTML = ''; appData.habits.forEach((h, i) => { let div = document.createElement('div'); div.className = 'habit-item'; let today = new Date().toISOString().slice(0,10); if(h.last === today) div.classList.add('done'); div.innerHTML = `<div class="habit-circle"><i class="fas fa-check"></i></div><small>${h.name}</small>`; div.onclick = () => { if(h.last === today) { h.last = null; h.streak--; } else { h.last = today; h.streak++; } triggerSync(); renderHabits(); }; c.appendChild(div); }); }
 function renderTodos() { const l = document.getElementById('todo-list'); if(!l) return; l.innerHTML = ''; appData.todos.forEach((t, i) => { let d = document.createElement('div'); d.className = 'todo-item' + (t.done ? ' done' : ''); d.innerHTML = `<input type="checkbox" ${t.done ? 'checked' : ''}><span>${t.text}</span><i class="fas fa-trash" style="margin-left:auto; cursor:pointer; color:#d9534f;"></i>`; d.querySelector('input').onclick = () => { t.done = !t.done; triggerSync(); renderTodos(); }; d.querySelector('i').onclick = () => { appData.todos.splice(i, 1); triggerSync(); renderTodos(); }; l.appendChild(d); }); }
@@ -228,138 +192,7 @@ function saveProfile() { appData.userName = document.getElementById('edit-name')
 function updateProfileUI() { if(appData.userName) { document.getElementById('dash-name').innerText = appData.userName; document.getElementById('edit-name').value = appData.userName; } if(appData.userPic) { document.getElementById('sidebar-pic').src = appData.userPic; document.getElementById('profile-pic-large').src = appData.userPic; } if(appData.theme === 'dark') document.body.setAttribute('data-theme', 'dark'); }
 function toggleTheme() { if(document.body.hasAttribute('data-theme')) { document.body.removeAttribute('data-theme'); appData.theme = 'light'; } else { document.body.setAttribute('data-theme', 'dark'); appData.theme = 'dark'; } triggerSync(); }
 function insertTemplate(type) { let t = ""; if(type === 'legal') t = "<b>Case Name:</b><br><b>Citation:</b><br><b>Facts:</b><br><br><b>Legal Issue:</b><br><br><b>Judgment:</b><br><br><b>Ratio Decidendi:</b><br>"; if(type === 'meeting') t = "<b>Meeting:</b><br><b>Date:</b><br><b>Attendees:</b><br><br><b>Key Points:</b><br>1.<br>2.<br><br><b>Action Items:</b><br>"; document.getElementById('note-body').innerHTML += t; }
+function renderColorPickers() { const c = document.getElementById('timetable-colors'); const h = document.getElementById('highlighter-toolbar'); if(!c) return; c.innerHTML = ''; h.innerHTML = ''; palette.forEach(col => { let dot = document.createElement('div'); dot.className = 'color-dot'; dot.style.background = col; dot.onclick = () => { selectedColor = col; }; c.appendChild(dot); let hl = document.createElement('div'); hl.className = 'hl-btn'; hl.style.background = col; hl.onmousedown = (e) => { e.preventDefault(); document.execCommand('hiliteColor', false, col); }; h.appendChild(hl); }); }
 function setupDragDrop() { const zone = document.getElementById('drop-zone'); if(!zone) return; zone.ondragover = (e) => { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; }; zone.ondragleave = (e) => { e.preventDefault(); zone.style.borderColor = 'var(--primary)'; }; zone.ondrop = (e) => { e.preventDefault(); zone.style.borderColor = 'var(--primary)'; const file = e.dataTransfer.files[0]; if(file && file.type.startsWith('image/')) { const reader = new FileReader(); reader.onload = (event) => { appData.userPic = event.target.result; triggerSync(); alert("Profile picture updated!"); }; reader.readAsDataURL(file); } }; }
 function downloadBackup() { const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData)); const downloadAnchorNode = document.createElement('a'); downloadAnchorNode.setAttribute("href", dataStr); downloadAnchorNode.setAttribute("download", "vibetable_backup_" + new Date().toISOString().slice(0,10) + ".json"); document.body.appendChild(downloadAnchorNode); downloadAnchorNode.click(); downloadAnchorNode.remove(); }
-function addAssessmentRow() {
-    const div = document.createElement('div'); div.className = 'grade-row';
-    div.innerHTML = `<input type="text" class="bubble-input asm-name" placeholder="Name" style="margin:0; padding:8px;"><input type="number" class="bubble-input asm-mark" placeholder="Mark %" style="margin:0; padding:8px;"><input type="number" class="bubble-input asm-weight" placeholder="Wght %" style="margin:0; padding:8px;"><i class="fas fa-trash" style="color: #d9534f; cursor: pointer; align-self: center;" onclick="this.parentElement.remove()"></i>`;
-    document.getElementById('assessment-list').appendChild(div);
-}
-function calcAdvancedGrade() {
-    const rows = document.querySelectorAll('.grade-row');
-    let totalAccumulated = 0; let totalWeightUsed = 0;
-    rows.forEach(row => {
-        const mark = parseFloat(row.querySelector('.asm-mark').value) || 0;
-        const weight = parseFloat(row.querySelector('.asm-weight').value) || 0;
-        totalAccumulated += (mark * (weight / 100)); totalWeightUsed += weight;
-    });
-    const target = parseInt(document.getElementById('grade-target').value);
-    const remainingWeight = 100 - totalWeightUsed;
-    const resultDiv = document.getElementById('grade-result'); resultDiv.style.display = 'block';
-    if (remainingWeight <= 0) { resultDiv.innerHTML = `Total Mark: <b>${Math.round(totalAccumulated)}%</b><br>Weights used up.`; return; }
-    const neededPoints = target - totalAccumulated;
-    const requiredExamMark = (neededPoints / remainingWeight) * 100;
-    let color = requiredExamMark > 100 ? '#d9534f' : '#155724';
-    let msg = requiredExamMark > 100 ? "Impossible (Need > 100%)" : `<b>${Math.round(requiredExamMark)}%</b>`;
-    resultDiv.innerHTML = `Current Year Mark: <b>${Math.round(totalAccumulated)}%</b> (of ${totalWeightUsed}%)<br>Required on Final (${remainingWeight}%) for ${target}%:<br><span style="font-size: 1.5rem; color: ${color};">${msg}</span>`;
-}
-
 const palette = ['#E3D8C1', '#CEC1A8', '#B59E7D', '#AAA396', '#E6CBB8', '#B4833D', '#81754B', '#584738', '#B8E6C1'];
-
-const MBUSO_SETUP = {
-  "userName": "Mbuso",
-  "userPic": null,
-  "theme": "light",
-  "startHour": 7,
-  "endHour": 23,
-  "showWeekends": false,
-  "events": [],
-  "timetable": {
-    "Mon-7": "Bible Session 1",
-    "Mon-8": "Gym Session 1",
-    "Mon-9": "Shower / Breakfast",
-    "Mon-10": "CLASS: LWCTA3-B11 (FL)",
-    "Mon-11": "CLASS: LWCTA3-B11 (FL)",
-    "Mon-12": "CLASS: LWCTA3-B11 (FL)",
-    "Mon-13": "Lunch",
-    "Mon-14": "Unwind / Code",
-    "Mon-15": "Unwind / Code",
-    "Mon-16": "Study Session",
-    "Mon-17": "Gym Session 2",
-    "Mon-18": "Shower / Dinner",
-    "Mon-19": "Bible Session 2",
-    "Mon-20": "Relax / Sleep",
-    "Mon-21": "Relax / Sleep",
-    "Mon-22": "Relax / Sleep",
-    "Mon-23": "Relax / Sleep",
-    "Tue-7": "Bible Session 1",
-    "Tue-8": "Gym Session 1",
-    "Tue-9": "Shower / Breakfast",
-    "Tue-10": "Unwind / Code",
-    "Tue-11": "Unwind / Code",
-    "Tue-12": "Unwind / Code",
-    "Tue-13": "Lunch",
-    "Tue-14": "Study Session",
-    "Tue-15": "Study Session",
-    "Tue-16": "Unwind / Code",
-    "Tue-17": "Gym Session 2",
-    "Tue-18": "Shower / Dinner",
-    "Tue-19": "Bible Session 2",
-    "Tue-20": "Relax / Sleep",
-    "Tue-21": "Relax / Sleep",
-    "Tue-22": "Relax / Sleep",
-    "Tue-23": "Relax / Sleep",
-    "Wed-7": "Bible Session 1",
-    "Wed-8": "Gym Session 1",
-    "Wed-9": "Shower / Prayer",
-    "Wed-10": "Unwind / Code",
-    "Wed-11": "Unwind / Code",
-    "Wed-12": "Unwind / Code",
-    "Wed-13": "Mid-Day Prayer (Fasting)",
-    "Wed-14": "Study Session",
-    "Wed-15": "Study Session",
-    "Wed-16": "Unwind / Code",
-    "Wed-17": "Gym Session 2",
-    "Wed-18": "Break Fast / Dinner",
-    "Wed-19": "Bible Session 2",
-    "Wed-20": "Relax / Sleep",
-    "Wed-21": "Relax / Sleep",
-    "Wed-22": "Relax / Sleep",
-    "Wed-23": "Relax / Sleep",
-    "Thu-7": "Bible Session 1",
-    "Thu-8": "Gym Session 1",
-    "Thu-9": "Shower / Breakfast",
-    "Thu-10": "Unwind / Code",
-    "Thu-11": "Unwind / Code",
-    "Thu-12": "Unwind / Code",
-    "Thu-13": "Lunch",
-    "Thu-14": "Study Session",
-    "Thu-15": "Study Session",
-    "Thu-16": "Unwind / Code",
-    "Thu-17": "Gym Session 2",
-    "Thu-18": "Shower / Dinner",
-    "Thu-19": "Bible Session 2",
-    "Thu-20": "Relax / Sleep",
-    "Thu-21": "Relax / Sleep",
-    "Thu-22": "Relax / Sleep",
-    "Thu-23": "Relax / Sleep",
-    "Fri-7": "Bible Session 1",
-    "Fri-8": "Gym Session 1",
-    "Fri-9": "Shower / Prayer",
-    "Fri-10": "Unwind / Code",
-    "Fri-11": "CLASS: COISA3-B14 (FL)",
-    "Fri-12": "Mid-Day Prayer (Fasting)",
-    "Fri-13": "Unwind / Code",
-    "Fri-14": "Unwind / Code",
-    "Fri-15": "CLASS: CORLA3-B11 (FT)",
-    "Fri-16": "CLASS: CORLA3-B11 (FT)",
-    "Fri-17": "Gym Session 2",
-    "Fri-18": "Break Fast / Dinner",
-    "Fri-19": "Bible Session 2",
-    "Fri-20": "Relax / Sleep",
-    "Fri-21": "Relax / Sleep",
-    "Fri-22": "Relax / Sleep",
-    "Fri-23": "Relax / Sleep"
-  },
-  "timetableColors": {},
-  "notes": [],
-  "noteGroups": ["General", "Study"],
-  "flashcards": [],
-  "habits": [
-    {"name": "Read", "streak": 0, "last": null},
-    {"name": "Gym", "streak": 0, "last": null},
-    {"name": "Prayer", "streak": 0, "last": null}
-  ],
-  "todos": [],
-  "timerTarget": null
-};
