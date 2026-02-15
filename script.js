@@ -1,4 +1,4 @@
-/* VibeTable Logic - Silent AutoSave & Manual Sync */
+/* VibeTable Logic - PDF Fix & Universal Sidebar */
 
 const CLIENT_ID = '951024875343-365jk5cjfkjbg8co3elc75jn41pe0ama.apps.googleusercontent.com'; 
 const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
@@ -20,7 +20,7 @@ let audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.og
 let timerInterval;
 let friendData = null; 
 let isViewingFriend = false;
-let hasUnsavedChanges = false; // Track dirty state
+let hasUnsavedChanges = false;
 
 const bibleVerses = {
     morning: ["Be strong and courageous. - Josh 1:9", "His mercies are new every morning. - Lam 3:23"],
@@ -56,13 +56,12 @@ async function handleLogin() {
     
     await loadData(); 
     
-    // --- SECURE LOADING ---
     if (user.email === 'mbusophiri01@gmail.com') {
         if (Object.keys(appData.timetable).length === 0) {
             appData = JSON.parse(JSON.stringify(MBUSO_SETUP)); 
             appData.userName = user.name;
             appData.userPic = user.picture;
-            autoSave(); // Save initial state silently
+            autoSave(); 
         }
     } else {
         if (!appData.userName || appData.userName === "Guest") { appData.userName = user.name; }
@@ -72,45 +71,11 @@ async function handleLogin() {
     updateSyncUI(true); refreshAllUI();
 }
 
-/* --- SAVE LOGIC (SPLIT) --- */
+/* --- SAVE LOGIC --- */
 const CURRENT_FILE = 'vibetable_v13.json'; 
-
-// 1. Silent Save (Changes Unsaved Indicator)
-function autoSave() {
-    localStorage.setItem('vibetable_data', JSON.stringify(appData));
-    hasUnsavedChanges = true;
-    updateSyncButtonState();
-}
-
-// 2. Manual Sync (Triggered by Button only)
-async function manualSync() {
-    autoSave(); // Ensure local is fresh
-    if(accessToken) { 
-        await saveDataToDrive(); 
-        hasUnsavedChanges = false;
-        updateSyncButtonState();
-        alert("Synced!"); 
-    } else { 
-        handleAuthClick(); 
-    }
-}
-
-function updateSyncButtonState() {
-    // Find all Save buttons and update their look
-    const btns = document.querySelectorAll('.btn-primary');
-    btns.forEach(btn => {
-        if(btn.innerText === "Save" || btn.innerText === "Save All") {
-            if(hasUnsavedChanges) {
-                btn.classList.add('unsaved');
-                btn.innerText = "Save (Unsaved Changes)";
-            } else {
-                btn.classList.remove('unsaved');
-                btn.innerText = "Save";
-            }
-        }
-    });
-}
-
+function autoSave() { localStorage.setItem('vibetable_data', JSON.stringify(appData)); hasUnsavedChanges = true; updateSyncButtonState(); }
+async function manualSync() { autoSave(); if(accessToken) { await saveDataToDrive(); hasUnsavedChanges = false; updateSyncButtonState(); alert("Synced!"); } else { handleAuthClick(); } }
+function updateSyncButtonState() { const btns = document.querySelectorAll('.btn-primary'); btns.forEach(btn => { if(btn.innerText.includes("Save")) { if(hasUnsavedChanges) { btn.classList.add('unsaved'); btn.innerText = "Save (Unsaved)"; } else { btn.classList.remove('unsaved'); btn.innerText = "Save"; } } }); }
 function checkSession() { const lastActive = localStorage.getItem('vibetable_last_active'); const now = Date.now(); if (lastActive && (now - lastActive > 1800000)) { document.getElementById('login-screen').style.display = 'flex'; document.getElementById('app-screen').classList.add('hidden'); } else { loadFromLocal(); } updateActivity(); }
 function updateActivity() { localStorage.setItem('vibetable_last_active', Date.now()); }
 function loadFromLocal() { const local = localStorage.getItem('vibetable_data'); if (local) { appData = JSON.parse(local); if(!appData.habits) appData.habits = [{name:"Read", streak:0, last:null}]; if(document.getElementById('login-screen')) document.getElementById('login-screen').remove(); document.getElementById('app-screen').classList.remove('hidden'); document.getElementById('app-screen').classList.add('active'); refreshAllUI(); } }
@@ -119,17 +84,30 @@ async function loadData() { try { let q = "https://www.googleapis.com/drive/v3/f
 async function saveDataToDrive() { if(!accessToken) return; const boundary = '-------314159265358979323846'; const delimiter = "\r\n--" + boundary + "\r\n"; const close_delim = "\r\n--" + boundary + "--"; const metadata = { name: CURRENT_FILE, mimeType: 'application/json', parents: ['appDataFolder'] }; const body = delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(metadata) + delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(appData) + close_delim; let path = '/upload/drive/v3/files?uploadType=multipart'; let method = 'POST'; if(driveFileId) { path = `/upload/drive/v3/files/${driveFileId}?uploadType=multipart`; method = 'PATCH'; } await fetch('https://www.googleapis.com' + path, { method: method, headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"', 'Authorization': 'Bearer ' + accessToken }, body: body }); updateSyncUI(true); }
 function refreshAllUI() { renderTimetable(); updateTimeLine(); updateDashboard(); renderNotes(); renderHabits(); renderTodos(); initHeatmap(); }
 
-/* --- NAVIGATION --- */
-function toggleSidebar() { const sidebar = document.getElementById('sidebar'); const overlay = document.getElementById('mobile-overlay'); if (window.innerWidth <= 768) { sidebar.classList.toggle('open'); overlay.classList.toggle('open'); } else { sidebar.classList.toggle('closed'); } }
-function switchTab(tabId) { 
-    // Navigation Safety Check
-    if(hasUnsavedChanges) {
-        // We silently auto-save on tab switch, but keep the dirty flag for the button
+/* --- NAVIGATION & SIDEBAR (UNIVERSAL TOGGLE) --- */
+function toggleGlobalSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('mobile-overlay');
+    const btn = document.getElementById('global-menu-btn');
+    
+    // Check if mobile
+    if (window.innerWidth <= 768) {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('open');
+    } else {
+        // Desktop
+        sidebar.classList.toggle('collapsed');
     }
-    document.querySelectorAll('.tab-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; }); const target = document.getElementById(tabId); if(target) { target.style.display = 'block'; setTimeout(() => target.classList.add('active'), 10); } document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active')); const btn = document.getElementById('btn-' + tabId); if(btn) btn.classList.add('active'); if(tabId === 'timetable') { renderTimetable(); updateTimeLine(); } if(tabId === 'dashboard') { updateDashboard(); renderHabits(); renderTodos(); } if(tabId === 'notes') renderNotes(); if(tabId === 'countdowns') { renderEvents(); initHeatmap(); } if(tabId === 'study') renderFlashcard(); if(tabId === 'profile') updateProfileUI(); if (window.innerWidth <= 768) { document.getElementById('sidebar').classList.remove('open'); document.getElementById('mobile-overlay').classList.remove('open'); } 
 }
 
-/* --- TIMETABLE LOGIC (CLEAN) --- */
+function switchTab(tabId) { 
+    if(hasUnsavedChanges) { /* silent check */ }
+    document.querySelectorAll('.tab-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; }); const target = document.getElementById(tabId); if(target) { target.style.display = 'block'; setTimeout(() => target.classList.add('active'), 10); } document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active')); const btn = document.getElementById('btn-' + tabId); if(btn) btn.classList.add('active'); if(tabId === 'timetable') { renderTimetable(); updateTimeLine(); } if(tabId === 'dashboard') { updateDashboard(); renderHabits(); renderTodos(); } if(tabId === 'notes') renderNotes(); if(tabId === 'countdowns') { renderEvents(); initHeatmap(); } if(tabId === 'study') renderFlashcard(); if(tabId === 'profile') updateProfileUI(); 
+    // Auto-close on mobile ONLY
+    if (window.innerWidth <= 768) { document.getElementById('sidebar').classList.remove('open'); document.getElementById('mobile-overlay').classList.remove('open'); } 
+}
+
+/* --- TIMETABLE LOGIC --- */
 function toggleWeekends() { appData.showWeekends = !appData.showWeekends; autoSave(); renderTimetable(); }
 function modifyTimetable(end, action) { if (action === 'add') { if(end === 'start' && appData.startHour > 0) appData.startHour--; if(end === 'end' && appData.endHour < 24) appData.endHour++; } else { if(end === 'start' && appData.startHour < appData.endHour) appData.startHour++; if(end === 'end' && appData.endHour > appData.startHour) appData.endHour--; } autoSave(); renderTimetable(); }
 
@@ -137,50 +115,23 @@ function renderTimetable() {
     const grid = document.getElementById('timetable-grid'); if(!grid) return; grid.innerHTML = ''; 
     const sourceData = isViewingFriend ? friendData : appData;
     if(sourceData.showWeekends) grid.classList.add('show-weekends'); else grid.classList.remove('show-weekends');
-    
-    // Define Headers
     const days = sourceData.showWeekends ? ['Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
     
-    // HEADERS
-    days.forEach((d, index) => { 
-        let div = document.createElement('div'); 
-        div.className = 'grid-header'; 
-        if(index === 0) div.classList.add('sticky-col'); 
-        div.innerText = d; 
-        grid.appendChild(div); 
-    });
+    // Headers
+    days.forEach((d, index) => { let div = document.createElement('div'); div.className = 'grid-header'; if(index === 0) div.classList.add('sticky-col'); div.innerText = d; grid.appendChild(div); });
     
-    // ROWS
+    // Rows
     for (let i = sourceData.startHour; i <= sourceData.endHour; i++) {
-        // Time Slot
         let time = document.createElement('div'); time.className = 'time-slot sticky-col'; time.innerText = `${i}:00`; grid.appendChild(time);
-        
-        // Data Slots
         let dayKeys = sourceData.showWeekends ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
         for (let j = 0; j < dayKeys.length; j++) {
             let key = `${dayKeys[j]}-${i}`; 
-            let slot = document.createElement('div'); 
-            slot.className = 'class-slot bubble';
+            let slot = document.createElement('div'); slot.className = 'class-slot bubble';
             if(sourceData.timetableColors && sourceData.timetableColors[key]) slot.style.background = sourceData.timetableColors[key];
-            
-            let input = document.createElement('input'); 
-            input.value = sourceData.timetable[key] || ''; 
+            let input = document.createElement('input'); input.value = sourceData.timetable[key] || ''; 
             if(isViewingFriend) input.readOnly = true; else input.placeholder = '+';
-            input.onchange = (e) => { 
-                if(!isViewingFriend) { 
-                    appData.timetable[key] = e.target.value; 
-                    autoSave(); // SILENT SAVE
-                } 
-            };
-            
-            slot.onclick = (e) => { 
-                if(!isViewingFriend && selectedColor) { 
-                    if(!appData.timetableColors) appData.timetableColors = {}; 
-                    appData.timetableColors[key] = selectedColor; 
-                    slot.style.background = selectedColor; 
-                    autoSave(); // SILENT SAVE
-                } 
-            };
+            input.onchange = (e) => { if(!isViewingFriend) { appData.timetable[key] = e.target.value; autoSave(); } };
+            slot.onclick = (e) => { if(!isViewingFriend && selectedColor) { if(!appData.timetableColors) appData.timetableColors = {}; appData.timetableColors[key] = selectedColor; slot.style.background = selectedColor; autoSave(); } };
             slot.appendChild(input); grid.appendChild(slot);
         }
     }
@@ -195,6 +146,46 @@ function updateTimeLine() {
     if (pixelsDown < headerHeight) pixelsDown = headerHeight; if (pixelsDown > maxPixels) pixelsDown = maxPixels; line.style.top = `${pixelsDown}px`; line.style.display = 'block';
 }
 
+/* --- PDF GENERATOR (FIXED FULL CAPTURE) --- */
+function downloadPDF() { 
+    // 1. Target the grid wrapper
+    const element = document.getElementById('capture-area');
+    
+    // 2. Force temporary styles to expand fully (ignore scrolling)
+    element.classList.add('pdf-mode');
+    document.body.classList.add('pdf-mode');
+    
+    // 3. Set explicit background for PDF
+    const originalBg = element.style.background;
+    element.style.background = appData.theme === 'dark' ? '#2b2b1e' : '#F7F1E1';
+    
+    // 4. Capture
+    html2canvas(element, { 
+        scale: 2, // High res
+        useCORS: true,
+        width: element.scrollWidth + 50, // Force full scroll width
+        height: element.scrollHeight + 50,
+        windowWidth: element.scrollWidth + 100
+    }).then(canvas => { 
+        const imgData = canvas.toDataURL('image/png'); 
+        const { jsPDF } = window.jspdf; 
+        
+        // 5. Create PDF matching canvas aspect ratio
+        const orientation = canvas.width > canvas.height ? 'l' : 'p';
+        const pdf = new jsPDF(orientation, 'mm', 'a4'); 
+        const pdfWidth = pdf.internal.pageSize.getWidth(); 
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width; 
+        
+        pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, pdfHeight); 
+        pdf.save("VibeTable_Schedule.pdf"); 
+        
+        // 6. Cleanup
+        element.style.background = originalBg; 
+        element.classList.remove('pdf-mode');
+        document.body.classList.remove('pdf-mode');
+    }); 
+}
+
 /* --- COLOR PICKER --- */
 function renderColorPickers() { 
     const c = document.getElementById('timetable-colors'); if(!c) return; c.innerHTML = ''; 
@@ -202,7 +193,6 @@ function renderColorPickers() {
         let dot = document.createElement('div'); dot.className = 'color-dot'; dot.style.background = col; 
         dot.onclick = () => { selectedColor = col; highlightActiveColor(dot); }; c.appendChild(dot); 
     });
-    // Rainbow Picker
     let customWrap = document.createElement('div');
     customWrap.className = 'custom-picker-wrapper';
     customWrap.title = "Pick any color";
@@ -210,19 +200,13 @@ function renderColorPickers() {
     customWrap.oninput = (e) => { selectedColor = e.target.value; customWrap.style.borderColor = selectedColor; };
     c.appendChild(customWrap);
 }
-
-function highlightActiveColor(activeDot) {
-    document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
-    document.querySelectorAll('.custom-picker-wrapper').forEach(d => d.style.border = '2px solid white');
-    activeDot.classList.add('active');
-}
+function highlightActiveColor(activeDot) { document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active')); document.querySelectorAll('.custom-picker-wrapper').forEach(d => d.style.border = '2px solid white'); activeDot.classList.add('active'); }
 
 /* --- OTHER UI --- */
 function updateDashboard() { const now = new Date(); const hr = now.getHours(); let greet = hr < 12 ? "Good Morning" : hr < 18 ? "Good Afternoon" : "Good Evening"; document.getElementById('greet-msg').innerText = `${greet}, ${appData.userName || 'Student'}.`; let verseType = 'morning'; if(hr >= 10 && hr < 15) verseType = 'midday'; if(hr >= 15 && hr < 20) verseType = 'evening'; if(hr >= 20 || hr < 5) verseType = 'night'; const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24); const verses = bibleVerses[verseType]; document.getElementById('daily-quote').innerText = verses[dayOfYear % verses.length]; const nextEvent = appData.events.find(e => new Date(e.date) > now); const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; const todayName = dayNames[now.getDay()]; let currentClass = appData.timetable[`${todayName}-${hr}`]; if(currentClass) { document.getElementById('up-next-display').innerText = `Now: ${currentClass}`; document.getElementById('up-next-sub').innerText = `Check timetable.`; } else if (nextEvent) { const diff = Math.ceil((new Date(nextEvent.date) - now) / (1000*60*60*24)); document.getElementById('up-next-display').innerText = `Upcoming: ${nextEvent.name}`; document.getElementById('up-next-sub').innerText = `In ${diff} days.`; } else { document.getElementById('up-next-display').innerText = "All caught up!"; document.getElementById('up-next-sub').innerText = "Time to relax."; } }
 function renderHabits() { const c = document.getElementById('habit-container'); if(!c) return; c.innerHTML = ''; appData.habits.forEach((h, i) => { let div = document.createElement('div'); div.className = 'habit-item'; let today = new Date().toISOString().slice(0,10); if(h.last === today) div.classList.add('done'); div.innerHTML = `<div class="habit-circle"><i class="fas fa-check"></i></div><small>${h.name}</small>`; div.onclick = () => { if(h.last === today) { h.last = null; h.streak--; } else { h.last = today; h.streak++; } autoSave(); renderHabits(); }; c.appendChild(div); }); }
 function renderTodos() { const l = document.getElementById('todo-list'); if(!l) return; l.innerHTML = ''; appData.todos.forEach((t, i) => { let d = document.createElement('div'); d.className = 'todo-item' + (t.done ? ' done' : ''); d.innerHTML = `<input type="checkbox" ${t.done ? 'checked' : ''}><span>${t.text}</span><i class="fas fa-trash" style="margin-left:auto; cursor:pointer; color:#d9534f;"></i>`; d.querySelector('input').onclick = () => { t.done = !t.done; autoSave(); renderTodos(); }; d.querySelector('i').onclick = () => { appData.todos.splice(i, 1); autoSave(); renderTodos(); }; l.appendChild(d); }); }
 function addTodo() { let v = document.getElementById('todo-input').value; if(v) { appData.todos.push({text:v, done:false}); document.getElementById('todo-input').value=''; autoSave(); renderTodos(); } }
-function downloadPDF() { const element = document.getElementById('capture-area'); element.style.background = appData.theme === 'dark' ? '#2b2b1e' : '#F7F1E1'; html2canvas(element, { scale: 2 }).then(canvas => { const imgData = canvas.toDataURL('image/png'); const { jsPDF } = window.jspdf; const pdf = new jsPDF('l', 'mm', 'a4'); const width = pdf.internal.pageSize.getWidth(); const height = (canvas.height * width) / canvas.width; pdf.addImage(imgData, 'PNG', 0, 10, width, height); pdf.save("VibeTable_Schedule.pdf"); element.style.background = 'transparent'; }); }
 function exportSchedule() { const shareData = { userName: appData.userName, timetable: appData.timetable, timetableColors: appData.timetableColors, startHour: appData.startHour, endHour: appData.endHour, showWeekends: appData.showWeekends }; const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(shareData)); const node = document.createElement('a'); node.setAttribute("href", dataStr); node.setAttribute("download", `${appData.userName || 'My'}_Schedule.vibe.json`); document.body.appendChild(node); node.click(); node.remove(); }
 function importFriendSchedule(input) { const file = input.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = function(e) { friendData = JSON.parse(e.target.result); isViewingFriend = true; document.getElementById('friend-mode-banner').style.display = 'flex'; document.getElementById('friend-mode-banner').querySelector('strong').innerText = `Viewing: ${friendData.userName}'s Schedule`; renderTimetable(); }; reader.readAsText(file); }
 function exitFriendMode() { isViewingFriend = false; friendData = null; document.getElementById('friend-mode-banner').style.display = 'none'; renderTimetable(); }
