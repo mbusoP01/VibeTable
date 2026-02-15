@@ -42,53 +42,70 @@ body { margin: 0; font-family: 'Nunito', sans-serif; background-color: var(--bg-
 .tab-content { display: none !important; width: 100%; height: 100%; overflow-y: auto; padding: 5rem 2rem 2rem 2rem; box-sizing: border-box; }
 .tab-content.active { display: block !important; }
 
-/* --- TIMETABLE GRID (SCROLL FIXED) --- */
+/* --- NEW TIMETABLE STRUCTURE (The Fix) --- */
 .timetable-wrapper { 
-    display: flex; flex-direction: column; align-items: center; width: 100%; 
-    overflow-x: auto; position: relative; 
-    -webkit-overflow-scrolling: touch; /* Smooth iOS scroll */
-    overscroll-behavior-x: contain; /* Prevents Safari Back Swipe */
+    display: flex; /* Flexbox: Time Column | Scrollable Days */
+    width: 100%; height: auto;
     border-radius: 15px; border: 1px solid rgba(0,0,0,0.05);
+    background: rgba(0,0,0,0.02);
+    overflow: hidden; /* Contains the scroll */
 }
 
-.timetable-grid { 
-    display: grid; 
-    /* 60px Time | Days */
-    grid-template-columns: 60px repeat(5, minmax(140px, 1fr)); 
-    gap: 1px; 
-    min-width: 800px; /* Force scrollable width */
-    background: rgba(0,0,0,0.05); 
+/* LEFT COLUMN (Fixed Time) */
+.time-column {
+    width: 60px; flex-shrink: 0; /* Cannot shrink */
+    background: var(--bg-color); 
+    border-right: 2px solid rgba(0,0,0,0.1); z-index: 20;
 }
-.timetable-grid.show-weekends { grid-template-columns: 60px repeat(7, minmax(140px, 1fr)); min-width: 1100px; }
 
-/* PDF MODE */
-.pdf-mode .timetable-wrapper { overflow: visible !important; width: auto !important; height: auto !important; }
-.pdf-mode .timetable-grid { width: 100% !important; min-width: 0 !important; }
-.pdf-mode .sticky-col { position: static !important; } 
-
-/* STICKY TIME COLUMN */
-.time-slot { 
-    background: var(--bg-color); text-align: center; font-size: 0.8rem; color: var(--text-muted); 
-    display: flex; align-items: center; justify-content: center; height: 60px;
-    position: sticky; left: 0; z-index: 50; /* High Z-Index to stay on top */
-    border-right: 1px solid rgba(0,0,0,0.1);
-    box-shadow: 2px 0 5px rgba(0,0,0,0.05); /* Shadow to separate from content */
+/* RIGHT AREA (Scrollable Days) */
+.days-scroll-area {
+    flex: 1; /* Takes remaining space */
+    overflow-x: auto; /* SCROLLS HORIZONTALLY */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
 }
-.grid-header { background: var(--bg-color); text-align: center; font-weight: 800; color: var(--primary); padding: 10px; position: sticky; top: 0; z-index: 40; }
-.grid-header.sticky-col { left: 0; z-index: 60; border-right: 1px solid rgba(0,0,0,0.1); }
 
-.class-slot { background: rgba(255,255,255,0.8); height: 60px; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
+.days-grid {
+    display: grid;
+    /* 5 Days default */
+    grid-template-columns: repeat(5, minmax(140px, 1fr)); 
+    width: 100%; min-width: 700px; /* Force scroll */
+}
+.days-grid.show-weekends {
+    grid-template-columns: repeat(7, minmax(140px, 1fr)); 
+    min-width: 980px;
+}
 
-/* --- IPHONE INPUT SCROLL FIX --- */
-.class-slot input { 
-    width: 100%; height: 100%; 
-    border: none; 
-    background: transparent !important; 
-    -webkit-appearance: none; 
-    text-align: center; font-weight: 600; color: var(--text); 
-    outline: none; padding: 5px; font-size: 0.9rem; 
-    /* THIS IS THE MAGIC FIX: */
-    touch-action: pan-x pan-y; /* Tells iOS "This is for scrolling, not selecting" */
+/* PDF MODE FIX */
+.pdf-mode .timetable-wrapper { display: block !important; overflow: visible !important; width: 100% !important; }
+.pdf-mode .time-column { width: 100% !important; border: none; } 
+.pdf-mode .days-scroll-area { overflow: visible !important; }
+
+/* CELLS */
+.grid-header { 
+    height: 50px; background: var(--bg-color); 
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; color: var(--primary); 
+    position: sticky; top: 0; z-index: 10;
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+.time-cell { 
+    height: 60px; display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; color: var(--text-muted); font-weight: bold;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+.day-cell { 
+    height: 60px; position: relative; 
+    background: rgba(255,255,255,0.6);
+    border-right: 1px solid rgba(0,0,0,0.05); border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+/* IPHONE INPUT FIX */
+.day-cell input { 
+    width: 100%; height: 100%; border: none; background: transparent !important; 
+    -webkit-appearance: none; text-align: center; font-weight: 600; color: var(--text); 
+    outline: none; padding: 5px; font-size: 0.9rem; touch-action: pan-x pan-y; 
 }
 
 /* COMPONENTS */
@@ -143,4 +160,6 @@ body { margin: 0; font-family: 'Nunito', sans-serif; background-color: var(--bg-
     .notepad-layout { grid-template-columns: 1fr; }
     .dashboard-grid { grid-template-columns: 1fr; }
     #global-menu-btn { top: 15px; left: 15px; }
+    /* Fix sticky headers on mobile */
+    .grid-header { top: 0; }
 }
