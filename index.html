@@ -26,12 +26,11 @@
     </div>
 
     <div id="app-screen" class="screen hidden">
-        <button id="mobile-menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+        <button id="global-menu-btn" onclick="toggleGlobalSidebar()"><i class="fas fa-bars"></i></button>
 
         <nav class="sidebar bubble-right" id="sidebar">
             <div class="sidebar-header">
                 <div class="brand"><i class="fas fa-seedling"></i> VibeTable</div>
-                <button onclick="toggleSidebar()" class="close-btn"><i class="fas fa-times"></i></button>
             </div>
             <div id="sync-status" class="status-badge offline" onclick="handleAuthClick()"><i class="fas fa-cloud-upload-alt"></i> <span>Offline Mode</span></div>
             <button id="btn-dashboard" class="nav-btn active" onclick="switchTab('dashboard')"><i class="fas fa-home"></i> Dashboard</button>
@@ -43,11 +42,9 @@
             <button id="btn-profile" class="nav-btn" onclick="switchTab('profile')"><img id="sidebar-pic" src="" class="profile-thumb"> Profile</button>
         </nav>
 
-        <div id="mobile-overlay" onclick="toggleSidebar()"></div>
+        <div id="mobile-overlay" onclick="toggleGlobalSidebar()"></div>
 
         <main class="content">
-            <button id="desktop-menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
-
             <section id="dashboard" class="tab-content active">
                 <div class="welcome-header"><h2 id="greet-msg">Hello.</h2></div>
                 <div class="glass-panel bubble" style="padding: 15px; margin-bottom: 20px;">
