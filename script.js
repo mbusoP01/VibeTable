@@ -1,4 +1,4 @@
-/* VibeTable Logic - Multi-User Enabled (v3.0) */
+/* VibeTable Logic - Mobile Layout Final Fix */
 
 const CLIENT_ID = '951024875343-365jk5cjfkjbg8co3elc75jn41pe0ama.apps.googleusercontent.com'; 
 const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
@@ -48,30 +48,16 @@ async function handleLogin() {
     if(document.getElementById('login-screen')) document.getElementById('login-screen').remove(); 
     document.getElementById('app-screen').classList.remove('hidden'); 
     document.getElementById('app-screen').classList.add('active'); 
-    
     let res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {headers:{'Authorization':'Bearer '+accessToken}}); 
     let user = await res.json(); 
-    
     if(user.picture) document.getElementById('sidebar-pic').src = user.picture; 
-    
-    // 1. Try to load THEIR data from THEIR Drive
     await loadData(); 
-    
-    // 2. If they are new (no timetable found), give them the Starter Template
-    if (Object.keys(appData.timetable).length === 0) {
-        console.log("New user detected. initializing template...");
-        appData = JSON.parse(JSON.stringify(STARTER_TEMPLATE)); // Clone the template
-        appData.userName = user.name;
-        appData.userPic = user.picture;
-        autoSave(); // Save to THEIR drive immediately
-    } else {
-        // Existing user: Just update their name/pic in case it changed on Google
-        if(appData.userName === "Guest" || !appData.userName) {
-             appData.userName = user.name;
-             appData.userPic = user.picture;
+    if (user.email === 'mbusophiri01@gmail.com') {
+        if (Object.keys(appData.timetable).length === 0) {
+            appData = JSON.parse(JSON.stringify(MBUSO_SETUP)); 
+            appData.userName = user.name; appData.userPic = user.picture; autoSave(); 
         }
-    }
-    
+    } else { if (!appData.userName || appData.userName === "Guest") { appData.userName = user.name; } }
     if(appData.userName) document.getElementById('dash-name').innerText = appData.userName; 
     updateSyncUI(true); refreshAllUI();
 }
@@ -93,57 +79,77 @@ function refreshAllUI() { renderTimetable(); updateTimeLine(); updateDashboard()
 function toggleGlobalSidebar() { const sidebar = document.getElementById('sidebar'); const overlay = document.getElementById('mobile-overlay'); if (window.innerWidth <= 768) { sidebar.classList.toggle('open'); overlay.classList.toggle('open'); } else { sidebar.classList.toggle('collapsed'); } }
 function switchTab(tabId) { if(hasUnsavedChanges) { /* silent */ } document.querySelectorAll('.tab-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; }); const target = document.getElementById(tabId); if(target) { target.style.display = 'block'; setTimeout(() => target.classList.add('active'), 10); } document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active')); const btn = document.getElementById('btn-' + tabId); if(btn) btn.classList.add('active'); if(tabId === 'timetable') { renderTimetable(); updateTimeLine(); } if(tabId === 'dashboard') { updateDashboard(); renderHabits(); renderTodos(); } if(tabId === 'notes') renderNotes(); if(tabId === 'countdowns') { renderEvents(); initHeatmap(); } if(tabId === 'study') renderFlashcard(); if(tabId === 'profile') updateProfileUI(); if (window.innerWidth <= 768) { document.getElementById('sidebar').classList.remove('open'); document.getElementById('mobile-overlay').classList.remove('open'); } }
 
-/* --- TIMETABLE LOGIC --- */
+/* --- TIMETABLE LOGIC (NEW SPLIT RENDER) --- */
 function toggleWeekends() { appData.showWeekends = !appData.showWeekends; autoSave(); renderTimetable(); }
 function modifyTimetable(end, action) { if (action === 'add') { if(end === 'start' && appData.startHour > 0) appData.startHour--; if(end === 'end' && appData.endHour < 24) appData.endHour++; } else { if(end === 'start' && appData.startHour < appData.endHour) appData.startHour++; if(end === 'end' && appData.endHour > appData.startHour) appData.endHour--; } autoSave(); renderTimetable(); }
 
 function renderTimetable() {
-    const grid = document.getElementById('timetable-grid'); if(!grid) return; grid.innerHTML = ''; 
+    const container = document.getElementById('timetable-container');
+    if(!container) return;
+    container.innerHTML = ''; // Clear old grid
+
     const sourceData = isViewingFriend ? friendData : appData;
-    if(sourceData.showWeekends) grid.classList.add('show-weekends'); else grid.classList.remove('show-weekends');
-    
-    // Safety Grid Reset
-    if(!sourceData.showWeekends) grid.style.gridTemplateColumns = "60px repeat(5, minmax(140px, 1fr))";
-    else grid.style.gridTemplateColumns = "60px repeat(7, minmax(140px, 1fr))";
+    const days = sourceData.showWeekends ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
-    const days = sourceData.showWeekends ? ['Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    // 1. Create Wrapper
+    const wrapper = document.createElement('div');
+    wrapper.className = 'timetable-wrapper';
+    wrapper.id = 'capture-area'; // Target for PDF
+
+    // 2. Left Column (Time)
+    const timeCol = document.createElement('div');
+    timeCol.className = 'time-column';
     
-    days.forEach((d, index) => { let div = document.createElement('div'); div.className = 'grid-header'; if(index === 0) div.classList.add('sticky-col'); div.innerText = d; grid.appendChild(div); });
+    let spacer = document.createElement('div'); spacer.className = 'grid-header'; spacer.innerText = 'Time'; timeCol.appendChild(spacer);
     
-    for (let i = sourceData.startHour; i <= sourceData.endHour; i++) {
-        let time = document.createElement('div'); time.className = 'time-slot sticky-col'; time.innerText = `${i}:00`; grid.appendChild(time);
-        let dayKeys = sourceData.showWeekends ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-        for (let j = 0; j < dayKeys.length; j++) {
-            let key = `${dayKeys[j]}-${i}`; 
-            let slot = document.createElement('div'); slot.className = 'class-slot bubble';
-            if(sourceData.timetableColors && sourceData.timetableColors[key]) slot.style.background = sourceData.timetableColors[key];
-            let input = document.createElement('input'); input.value = sourceData.timetable[key] || ''; 
-            if(isViewingFriend) input.readOnly = true; else input.placeholder = '+';
-            input.onchange = (e) => { if(!isViewingFriend) { appData.timetable[key] = e.target.value; autoSave(); } };
-            slot.onclick = (e) => { if(!isViewingFriend && selectedColor) { if(!appData.timetableColors) appData.timetableColors = {}; appData.timetableColors[key] = selectedColor; slot.style.background = selectedColor; autoSave(); } };
-            slot.appendChild(input); grid.appendChild(slot);
-        }
+    for(let i = sourceData.startHour; i <= sourceData.endHour; i++) {
+        let cell = document.createElement('div'); cell.className = 'time-cell'; cell.innerText = `${i}:00`; timeCol.appendChild(cell);
     }
-    updateTimeLine();
+    wrapper.appendChild(timeCol);
+
+    // 3. Right Area (Days)
+    const scrollArea = document.createElement('div');
+    scrollArea.className = 'days-scroll-area';
+    
+    const grid = document.createElement('div');
+    grid.className = 'days-grid' + (sourceData.showWeekends ? ' show-weekends' : '');
+    
+    // Headers
+    days.forEach(d => { let th = document.createElement('div'); th.className = 'grid-header'; th.innerText = d; grid.appendChild(th); });
+
+    // Cells
+    for(let i = sourceData.startHour; i <= sourceData.endHour; i++) {
+        days.forEach(d => {
+            let key = `${d}-${i}`;
+            let cell = document.createElement('div'); cell.className = 'day-cell bubble';
+            if(sourceData.timetableColors && sourceData.timetableColors[key]) cell.style.background = sourceData.timetableColors[key];
+            
+            let input = document.createElement('input'); 
+            input.value = sourceData.timetable[key] || ''; 
+            if(isViewingFriend) input.readOnly = true; else input.placeholder = '+';
+            
+            input.onchange = (e) => { if(!isViewingFriend) { appData.timetable[key] = e.target.value; autoSave(); } };
+            cell.onclick = (e) => { if(!isViewingFriend && selectedColor) { if(!appData.timetableColors) appData.timetableColors = {}; appData.timetableColors[key] = selectedColor; cell.style.background = selectedColor; autoSave(); } };
+            
+            cell.appendChild(input); grid.appendChild(cell);
+        });
+    }
+    scrollArea.appendChild(grid);
+    wrapper.appendChild(scrollArea);
+    container.appendChild(wrapper);
 }
 
-function updateTimeLine() {
-    const line = document.getElementById('current-time-line'); const now = new Date(); const currentHour = now.getHours(); const currentMin = now.getMinutes();
-    const headerHeight = 40; const rowHeight = 61; let hoursPastStart = currentHour - appData.startHour;
-    let pixelsDown = headerHeight + (hoursPastStart * rowHeight) + ((currentMin / 60) * rowHeight);
-    const maxPixels = headerHeight + ((appData.endHour - appData.startHour + 1) * rowHeight);
-    if (pixelsDown < headerHeight) pixelsDown = headerHeight; if (pixelsDown > maxPixels) pixelsDown = maxPixels; line.style.top = `${pixelsDown}px`; line.style.display = 'block';
-}
+function updateTimeLine() { /* Simplified: Line removed for cleaner UI in this layout */ }
 
-/* --- PDF GENERATOR --- */
+/* --- PDF GENERATOR (FIXED) --- */
 function downloadPDF() { 
     const element = document.getElementById('capture-area');
-    element.classList.add('pdf-mode'); document.body.classList.add('pdf-mode');
+    document.body.classList.add('pdf-mode'); // Force expand
+    
     const originalBg = element.style.background;
     element.style.background = appData.theme === 'dark' ? '#2b2b1e' : '#F7F1E1';
     
-    html2canvas(element, { scale: 2, useCORS: true, width: element.scrollWidth + 50, height: element.scrollHeight + 50, windowWidth: element.scrollWidth + 100
-    }).then(canvas => { 
+    html2canvas(element, { scale: 2, useCORS: true }).then(canvas => { 
         const imgData = canvas.toDataURL('image/png'); 
         const { jsPDF } = window.jspdf; 
         const orientation = canvas.width > canvas.height ? 'l' : 'p';
@@ -152,8 +158,9 @@ function downloadPDF() {
         const pdfHeight = (canvas.height * pdfWidth) / canvas.width; 
         pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, pdfHeight); 
         pdf.save("VibeTable_Schedule.pdf"); 
+        
         element.style.background = originalBg; 
-        element.classList.remove('pdf-mode'); document.body.classList.remove('pdf-mode');
+        document.body.classList.remove('pdf-mode'); 
     }); 
 }
 
@@ -174,7 +181,7 @@ function renderColorPickers() {
 function highlightActiveColor(activeDot) { document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active')); document.querySelectorAll('.custom-picker-wrapper').forEach(d => d.style.border = '2px solid white'); activeDot.classList.add('active'); }
 
 /* --- OTHER UI --- */
-function updateDashboard() { const now = new Date(); const hr = now.getHours(); let greet = hr < 12 ? "Good Morning" : hr < 18 ? "Good Afternoon" : "Good Evening"; document.getElementById('greet-msg').innerText = `${greet}, ${appData.userName || 'Student'}.`; let verseType = 'morning'; if(hr >= 10 && hr < 15) verseType = 'midday'; if(hr >= 15 && hr < 20) verseType = 'evening'; if(hr >= 20 || hr < 5) verseType = 'night'; const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24); const verses = bibleVerses[verseType]; document.getElementById('daily-quote').innerText = verses[dayOfYear % verses.length]; const nextEvent = appData.events.find(e => new Date(e.date) > now); const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; const todayName = dayNames[now.getDay()]; let currentClass = appData.timetable[`${todayName}-${hr}`]; if(currentClass) { document.getElementById('up-next-display').innerText = `Now: ${currentClass}`; document.getElementById('up-next-sub').innerText = `Check timetable.`; } else if (nextEvent) { const diff = Math.ceil((new Date(nextEvent.date) - now) / (1000*60*60*24)); document.getElementById('up-next-display').innerText = `Upcoming: ${nextEvent.name}`; document.getElementById('up-next-sub').innerText = `In ${diff} days.`; } else { document.getElementById('up-next-display').innerText = "All caught up!"; document.getElementById('up-next-sub').innerText = "Time to relax."; } }
+function updateDashboard() { const now = new Date(); const hr = now.getHours(); let greet = hr < 12 ? "Good Morning" : hr < 18 ? "Good Afternoon" : "Good Evening"; document.getElementById('greet-msg').innerText = `${greet}, ${appData.userName || 'Student'}. (v3.0)`; let verseType = 'morning'; if(hr >= 10 && hr < 15) verseType = 'midday'; if(hr >= 15 && hr < 20) verseType = 'evening'; if(hr >= 20 || hr < 5) verseType = 'night'; const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24); const verses = bibleVerses[verseType]; document.getElementById('daily-quote').innerText = verses[dayOfYear % verses.length]; const nextEvent = appData.events.find(e => new Date(e.date) > now); const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; const todayName = dayNames[now.getDay()]; let currentClass = appData.timetable[`${todayName}-${hr}`]; if(currentClass) { document.getElementById('up-next-display').innerText = `Now: ${currentClass}`; document.getElementById('up-next-sub').innerText = `Check timetable.`; } else if (nextEvent) { const diff = Math.ceil((new Date(nextEvent.date) - now) / (1000*60*60*24)); document.getElementById('up-next-display').innerText = `Upcoming: ${nextEvent.name}`; document.getElementById('up-next-sub').innerText = `In ${diff} days.`; } else { document.getElementById('up-next-display').innerText = "All caught up!"; document.getElementById('up-next-sub').innerText = "Time to relax."; } }
 function renderHabits() { const c = document.getElementById('habit-container'); if(!c) return; c.innerHTML = ''; appData.habits.forEach((h, i) => { let div = document.createElement('div'); div.className = 'habit-item'; let today = new Date().toISOString().slice(0,10); if(h.last === today) div.classList.add('done'); div.innerHTML = `<div class="habit-circle"><i class="fas fa-check"></i></div><small>${h.name}</small>`; div.onclick = () => { if(h.last === today) { h.last = null; h.streak--; } else { h.last = today; h.streak++; } autoSave(); renderHabits(); }; c.appendChild(div); }); }
 function renderTodos() { const l = document.getElementById('todo-list'); if(!l) return; l.innerHTML = ''; appData.todos.forEach((t, i) => { let d = document.createElement('div'); d.className = 'todo-item' + (t.done ? ' done' : ''); d.innerHTML = `<input type="checkbox" ${t.done ? 'checked' : ''}><span>${t.text}</span><i class="fas fa-trash" style="margin-left:auto; cursor:pointer; color:#d9534f;"></i>`; d.querySelector('input').onclick = () => { t.done = !t.done; autoSave(); renderTodos(); }; d.querySelector('i').onclick = () => { appData.todos.splice(i, 1); autoSave(); renderTodos(); }; l.appendChild(d); }); }
 function addTodo() { let v = document.getElementById('todo-input').value; if(v) { appData.todos.push({text:v, done:false}); document.getElementById('todo-input').value=''; autoSave(); renderTodos(); } }
@@ -237,8 +244,8 @@ function calcAdvancedGrade() {
 
 const palette = ['#E3D8C1', '#CEC1A8', '#B59E7D', '#AAA396', '#E6CBB8', '#B4833D', '#81754B', '#584738', '#B8E6C1'];
 
-const STARTER_TEMPLATE = {
-  "userName": "New User",
+const MBUSO_SETUP = {
+  "userName": "Mbuso",
   "userPic": null,
   "theme": "light",
   "startHour": 7,
@@ -246,23 +253,91 @@ const STARTER_TEMPLATE = {
   "showWeekends": false,
   "events": [],
   "timetable": {
-    "Mon-7": "Morning Routine",
-    "Mon-8": "Gym / Exercise",
-    "Mon-9": "Breakfast",
-    "Mon-10": "Deep Work / Class",
-    "Mon-11": "Deep Work / Class",
-    "Mon-12": "Deep Work / Class",
+    "Mon-7": "Bible Session 1",
+    "Mon-8": "Gym Session 1",
+    "Mon-9": "Shower / Breakfast",
+    "Mon-10": "CLASS: LWCTA3-B11 (FL)",
+    "Mon-11": "CLASS: LWCTA3-B11 (FL)",
+    "Mon-12": "CLASS: LWCTA3-B11 (FL)",
     "Mon-13": "Lunch",
-    "Mon-14": "Focus Session",
-    "Mon-15": "Focus Session",
-    "Mon-16": "Review / Study",
-    "Mon-17": "Evening Exercise",
-    "Mon-18": "Dinner",
-    "Mon-19": "Relax / Read",
-    "Mon-20": "Wind Down",
-    "Mon-21": "Sleep Prep",
-    "Mon-22": "Sleep",
-    "Mon-23": "Sleep"
+    "Mon-14": "Unwind / Code",
+    "Mon-15": "Unwind / Code",
+    "Mon-16": "Study Session",
+    "Mon-17": "Gym Session 2",
+    "Mon-18": "Shower / Dinner",
+    "Mon-19": "Bible Session 2",
+    "Mon-20": "Relax / Sleep",
+    "Mon-21": "Relax / Sleep",
+    "Mon-22": "Relax / Sleep",
+    "Mon-23": "Relax / Sleep",
+    "Tue-7": "Bible Session 1",
+    "Tue-8": "Gym Session 1",
+    "Tue-9": "Shower / Breakfast",
+    "Tue-10": "Unwind / Code",
+    "Tue-11": "Unwind / Code",
+    "Tue-12": "Unwind / Code",
+    "Tue-13": "Lunch",
+    "Tue-14": "Study Session",
+    "Tue-15": "Study Session",
+    "Tue-16": "Unwind / Code",
+    "Tue-17": "Gym Session 2",
+    "Tue-18": "Shower / Dinner",
+    "Tue-19": "Bible Session 2",
+    "Tue-20": "Relax / Sleep",
+    "Tue-21": "Relax / Sleep",
+    "Tue-22": "Relax / Sleep",
+    "Tue-23": "Relax / Sleep",
+    "Wed-7": "Bible Session 1",
+    "Wed-8": "Gym Session 1",
+    "Wed-9": "Shower / Prayer",
+    "Wed-10": "Unwind / Code",
+    "Wed-11": "Unwind / Code",
+    "Wed-12": "Unwind / Code",
+    "Wed-13": "Mid-Day Prayer (Fasting)",
+    "Wed-14": "Study Session",
+    "Wed-15": "Study Session",
+    "Wed-16": "Unwind / Code",
+    "Wed-17": "Gym Session 2",
+    "Wed-18": "Break Fast / Dinner",
+    "Wed-19": "Bible Session 2",
+    "Wed-20": "Relax / Sleep",
+    "Wed-21": "Relax / Sleep",
+    "Wed-22": "Relax / Sleep",
+    "Wed-23": "Relax / Sleep",
+    "Thu-7": "Bible Session 1",
+    "Thu-8": "Gym Session 1",
+    "Thu-9": "Shower / Breakfast",
+    "Thu-10": "Unwind / Code",
+    "Thu-11": "Unwind / Code",
+    "Thu-12": "Unwind / Code",
+    "Thu-13": "Lunch",
+    "Thu-14": "Study Session",
+    "Thu-15": "Study Session",
+    "Thu-16": "Unwind / Code",
+    "Thu-17": "Gym Session 2",
+    "Thu-18": "Shower / Dinner",
+    "Thu-19": "Bible Session 2",
+    "Thu-20": "Relax / Sleep",
+    "Thu-21": "Relax / Sleep",
+    "Thu-22": "Relax / Sleep",
+    "Thu-23": "Relax / Sleep",
+    "Fri-7": "Bible Session 1",
+    "Fri-8": "Gym Session 1",
+    "Fri-9": "Shower / Prayer",
+    "Fri-10": "Unwind / Code",
+    "Fri-11": "CLASS: COISA3-B14 (FL)",
+    "Fri-12": "Mid-Day Prayer (Fasting)",
+    "Fri-13": "Unwind / Code",
+    "Fri-14": "Unwind / Code",
+    "Fri-15": "CLASS: CORLA3-B11 (FT)",
+    "Fri-16": "CLASS: CORLA3-B11 (FT)",
+    "Fri-17": "Gym Session 2",
+    "Fri-18": "Break Fast / Dinner",
+    "Fri-19": "Bible Session 2",
+    "Fri-20": "Relax / Sleep",
+    "Fri-21": "Relax / Sleep",
+    "Fri-22": "Relax / Sleep",
+    "Fri-23": "Relax / Sleep"
   },
   "timetableColors": {},
   "notes": [],
