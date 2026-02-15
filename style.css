@@ -42,46 +42,53 @@ body { margin: 0; font-family: 'Nunito', sans-serif; background-color: var(--bg-
 .tab-content { display: none !important; width: 100%; height: 100%; overflow-y: auto; padding: 5rem 2rem 2rem 2rem; box-sizing: border-box; }
 .tab-content.active { display: block !important; }
 
-/* TIMETABLE GRID (FIXED) */
+/* --- TIMETABLE GRID (SCROLL FIXED) --- */
 .timetable-wrapper { 
     display: flex; flex-direction: column; align-items: center; width: 100%; 
     overflow-x: auto; position: relative; 
-    -webkit-overflow-scrolling: touch; 
+    -webkit-overflow-scrolling: touch; /* Smooth iOS scroll */
+    overscroll-behavior-x: contain; /* Prevents Safari Back Swipe */
     border-radius: 15px; border: 1px solid rgba(0,0,0,0.05);
 }
 
 .timetable-grid { 
     display: grid; 
+    /* 60px Time | Days */
     grid-template-columns: 60px repeat(5, minmax(140px, 1fr)); 
     gap: 1px; 
-    min-width: 760px; 
+    min-width: 800px; /* Force scrollable width */
     background: rgba(0,0,0,0.05); 
 }
-.timetable-grid.show-weekends { grid-template-columns: 60px repeat(7, minmax(140px, 1fr)); min-width: 1040px; }
+.timetable-grid.show-weekends { grid-template-columns: 60px repeat(7, minmax(140px, 1fr)); min-width: 1100px; }
 
-/* PDF CAPTURE MODE */
+/* PDF MODE */
 .pdf-mode .timetable-wrapper { overflow: visible !important; width: auto !important; height: auto !important; }
 .pdf-mode .timetable-grid { width: 100% !important; min-width: 0 !important; }
 .pdf-mode .sticky-col { position: static !important; } 
 
+/* STICKY TIME COLUMN */
 .time-slot { 
     background: var(--bg-color); text-align: center; font-size: 0.8rem; color: var(--text-muted); 
     display: flex; align-items: center; justify-content: center; height: 60px;
-    position: sticky; left: 0; z-index: 35; border-right: 1px solid rgba(0,0,0,0.1);
+    position: sticky; left: 0; z-index: 50; /* High Z-Index to stay on top */
+    border-right: 1px solid rgba(0,0,0,0.1);
+    box-shadow: 2px 0 5px rgba(0,0,0,0.05); /* Shadow to separate from content */
 }
-.grid-header { background: var(--bg-color); text-align: center; font-weight: 800; color: var(--primary); padding: 10px; position: sticky; top: 0; z-index: 30; }
-.grid-header.sticky-col { left: 0; z-index: 40; border-right: 1px solid rgba(0,0,0,0.1); }
+.grid-header { background: var(--bg-color); text-align: center; font-weight: 800; color: var(--primary); padding: 10px; position: sticky; top: 0; z-index: 40; }
+.grid-header.sticky-col { left: 0; z-index: 60; border-right: 1px solid rgba(0,0,0,0.1); }
 
 .class-slot { background: rgba(255,255,255,0.8); height: 60px; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
 
-/* --- IPHONE INPUT FIX --- */
+/* --- IPHONE INPUT SCROLL FIX --- */
 .class-slot input { 
     width: 100%; height: 100%; 
     border: none; 
-    background: transparent !important; /* Force transparent */
-    -webkit-appearance: none; /* Remove iOS styles */
+    background: transparent !important; 
+    -webkit-appearance: none; 
     text-align: center; font-weight: 600; color: var(--text); 
     outline: none; padding: 5px; font-size: 0.9rem; 
+    /* THIS IS THE MAGIC FIX: */
+    touch-action: pan-x pan-y; /* Tells iOS "This is for scrolling, not selecting" */
 }
 
 /* COMPONENTS */
